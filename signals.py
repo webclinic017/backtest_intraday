@@ -296,8 +296,9 @@ def calculate_correl_score_series_for_df(df, correls_dict):
     # # df_merged = pd.concat([df_awesome_normalized_position_score, df_joint_20_normalized_position_score, df_joint_50_normalized_position_score, df_cumulative_rsi_normalized_position_score])
     # df_merged = pd.concat([df_awesome_normalized_position_score])
 
+
     for key, value in correls_dict.items():
-        if df['position_score'].any() != '':
+        if '' not in df['position_score'].values:
             df['position_score'] = df[key] * value + df['position_score']
         else:
             df['position_score'] = df[key] * value

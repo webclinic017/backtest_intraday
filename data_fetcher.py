@@ -100,6 +100,36 @@ async def get_stock_data_trade_daily_alpha_vantage(ticker):
     return ticker, df
 
 
+def get_stock_data_intraday_alpha_vantage(ticker):
+    print(ticker)
+    api_key = open(key_path, 'r').read()
+
+    aggregated_df = pd.DataFrame()
+    for i in range(1, 25):
+        print(f'month {i}')
+        data = retry_get_request(f'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY_EXTENDED&symbol={ticker}&apikey={api_key}&interval=5min&slice=year{1 if i <= 12 else 2}month{i if i <= 12 else i - 12}&outputsize=full').content
+
+        if data is None:
+            continue
+        data = pd.read_csv(io.StringIO(data.decode('utf-8')))
+        if 'close' not in data:
+            continue
+        # data = data.set_index('time')
+        # data.index = pd.to_datetime(data.index)
+        # data = data.between_time('9:30', '16:00')
+        # data = data.reset_index()
+        aggregated_df = aggregated_df.append(data)
+        time.sleep(0.2)
+    if aggregated_df is None:
+        return None
+    if 'close' not in aggregated_df:
+        return None
+    aggregated_df = aggregated_df[['time', 'open', 'high', 'low', 'close', 'volume']]
+    aggregated_df.columns = ["Date", "Open","High","Low","Close","Volume"]
+    dataframe = aggregated_df.iloc[::-1].reset_index(drop=True)
+    return dataframe
+
+
 def get_data_for_stock(ticker, interval, start_time, time_module):
     # switch call between daily adjusted, TODO: intraday_extended! and weekly adjusted
     if interval == 'D':
@@ -122,24 +152,11 @@ def get_data_dict_for_multiple_stocks(tickers, time_module):
     ohlc_intraday = {} # dictionary with ohlc value for each stock
     # api_usage_limit_per_minute = 150
     api_usage_limit_per_minute = 1
-    total_number_of_stocks = len(tickers)
-    total_batches_number = math.ceil(total_number_of_stocks / api_usage_limit_per_minute)
-    all_results = []
-    loop = asyncio.get_event_loop()
-    for i in range(total_batches_number):
-        tasks = [get_stock_data_trade_daily_alpha_vantage(ticker) for ticker in tickers[i*api_usage_limit_per_minute : min((i+1)*api_usage_limit_per_minute, total_number_of_stocks)]]
-        group = asyncio.gather(*tasks)
-        batch_results = loop.run_until_complete(group)
-        # time_module.sleep(60)
-        time_module.sleep(0.05)
-        all_results = all_results + batch_results
-    loop.close()
 
-    for result in all_results:
-        ohlc_intraday[result[0]] = result[1]
-        # earnings = get_stock_earnings_data(ticker, start_time, time_module)
-        # stock_data['is_earning_days'] = add_earnings_dates_to_stock(stock_data, earnings)
-        ohlc_intraday[result[0]]['is_earning_days'] = ''  # TODO: once I get how to catch and retry, add the earnings back!
+    for ticker in tickers:
+        ohlc_intraday[ticker] = get_stock_data_intraday_alpha_vantage(ticker)
+        ohlc_intraday[ticker]['is_earning_days'] = ''  # TODO: once I get how to catch and retry, add the earnings back!
+
     return ohlc_intraday
 
 

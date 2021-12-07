@@ -223,3 +223,13 @@ def normalize_columns(df, columns_list):
         temp_df[[col]] = scaler.fit_transform(temp_df[[f'temp_{col}']])
         df[f'{col}_norm'] = temp_df[col]
     return df
+
+
+def get_breakout_column_for_stock(df, breaker_column_name, column_to_break_name, result_column_name):
+    df[result_column_name] = False
+    for i in range(len(df)):
+        if i > 1:
+            if (df.at[i - 1, breaker_column_name] <= df.at[i - 1, column_to_break_name]) and (df.at[i, breaker_column_name] > df.at[i, column_to_break_name]):
+                df.at[i, result_column_name] = True
+    return df[result_column_name]
+

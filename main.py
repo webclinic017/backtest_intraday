@@ -7,7 +7,7 @@ from data_fetcher import get_sp500_list, get_data_dict_for_all_stocks_in_directo
 from strategies import calculate_exits_column_by_atr_and_prev_max_min
 from indicators import get_ma_column_for_stock, get_distance_between_columns_for_stock, \
     get_adx_column_for_stock, rsi, stochastic, get_ATR_column_for_stock, get_volatility_from_atr, \
-    get_macd_columns_for_stock, normalize_columns, get_beta_column
+    get_macd_columns_for_stock, normalize_columns, get_beta_column, get_breakout_column_for_stock
 from signals import indicators_mid_levels_signal, parabolic_trending_n_periods, cross_20_ma, cross_50_ma, joint_signal, \
     macd_cross_0_signal, macd_signal_cross_signal, joint_macd_signal_cross_signal, joint_macd_cross_0_signal, \
     awesome_oscilator, calculate_correl_score_series_for_df, cumulative_rsi_signal
@@ -25,17 +25,16 @@ tickers = get_sp500_list()
 adjusted_tickers = [elem for elem in tickers if elem != 'GOOG' and elem != 'DUK' and elem != 'HLT' and elem != 'DD' and elem != 'CMCSA' and elem != 'COG' and elem != 'WBA' and elem != 'KMX' and elem != 'ADP' and elem != 'STZ' and elem != 'IQV'] # there were stock splits
 adjusted_tickers = [elem for elem in adjusted_tickers if '.' not in elem]
 # yahoo finance screener - mega caps only, tech, energey and finance
-# adjusted_tickers = ['FB', 'AAPL', 'NFLX', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'BAC', 'C', 'TWTR', 'MA', 'TSM', 'V', 'JPM', 'NVDA', 'XOM', 'CVX']
-# adjusted_tickers = ['FB', 'AAPL', 'NFLX', 'GOOGL', 'MSFT', 'AMZN']
-adjusted_tickers = adjusted_tickers + ['SPY', 'QQQ', 'IWM']
-# adjusted_tickers = adjusted_tickers[378:500] # in the middle - missing
-# adjusted_tickers = adjusted_tickers[:250] # from beginning
-# adjusted_tickers = ['QQQ', 'SPY', 'IWM']
+adjusted_tickers = ['FB', 'AAPL', 'NFLX', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'BAC', 'C', 'TWTR', 'MA', 'TSM', 'V', 'NVDA', 'XOM', 'CVX']
+# adjusted_tickers = ['MSFT']
 
-# stocks_dict = get_data_dict_for_multiple_stocks(adjusted_tickers, time)
+adjusted_tickers = adjusted_tickers + ['SPY', 'QQQ', 'IWM']
+# adjusted_tickers = adjusted_tickers + ['SPY']
+
+stocks_dict = get_data_dict_for_multiple_stocks(adjusted_tickers, time)
 # spy_df = stocks_dict['SPY']
 
-stocks_dict, adjusted_tickers = get_data_dict_for_all_stocks_in_directory('stocks_csvs_new')
+# stocks_dict, adjusted_tickers = get_data_dict_for_all_stocks_in_directory('stocks_csvs_new')
 
 # adjusted_tickers = ['FB', 'AAPL', 'NFLX', 'GOOGL', 'MSFT', 'AMZN', 'SPY', 'QQQ', 'IWM']
 
@@ -58,6 +57,9 @@ for ticker in adjusted_tickers:
     stocks_dict[ticker]['10_ma_volume'] = get_ma_column_for_stock(stocks_dict[ticker], 'Volume', 10)
     stocks_dict[ticker]['20_ma_volume'] = get_ma_column_for_stock(stocks_dict[ticker], 'Volume', 20)
     stocks_dict[ticker]['50_ma_volume'] = get_ma_column_for_stock(stocks_dict[ticker], 'Volume', 50)
+    stocks_dict[ticker]['10_ma_volume_break'] = get_breakout_column_for_stock(stocks_dict[ticker], 'Volume', '10_ma_volume', '10_ma_volume_break')
+    stocks_dict[ticker]['20_ma_volume_break'] = get_breakout_column_for_stock(stocks_dict[ticker], 'Volume', '20_ma_volume', '20_ma_volume_break')
+    stocks_dict[ticker]['50_ma_volume_break'] = get_breakout_column_for_stock(stocks_dict[ticker], 'Volume', '50_ma_volume', '50_ma_volume_break')
     stocks_dict[ticker]['10_beta_SPY'] = get_beta_column(stocks_dict[ticker], stocks_dict['SPY'], 10)
     stocks_dict[ticker]['50_beta_SPY'] = get_beta_column(stocks_dict[ticker], stocks_dict['SPY'], 50)
     # stocks_dict[ticker]['10_beta_QQQ'] = get_beta_column(stocks_dict[ticker], stocks_dict['QQQ'], 10)
@@ -329,8 +331,8 @@ def add_spy_qqq_close(df, spy_df, qqq_df):
 
 
 all_actions_df = add_average_gain_for_same_day_col(all_actions_df)
-all_actions_df = add_gap_n_days_col(all_actions_df, 5)
-all_actions_df = add_spy_qqq_close(all_actions_df, stocks_dict['SPY'], stocks_dict['QQQ'])
+# all_actions_df = add_gap_n_days_col(all_actions_df, 5)
+# all_actions_df = add_spy_qqq_close(all_actions_df, stocks_dict['SPY'], stocks_dict['QQQ'])
 
 all_actions_df.to_csv(f'stocks_csvs_new/all_actions_df.csv', index=False)
 

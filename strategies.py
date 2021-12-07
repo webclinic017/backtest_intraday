@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from signals import check_volume_high_enough, check_not_earnings_days, check_atr_volatility_low_enough, \
     check_additional_positive_indicators
+from datetime import datetime
 
 
 def get_position_direction_and_index(df, i, signal_column_name, in_position_column):
@@ -64,6 +65,7 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
     position_counter = 1
     for i in range(len(df)):
         if i > 1:
+            current_date = datetime.strptime(df.at[i, 'Date'], '%Y-%m-%d %H:%M:%S')
             # check in position
             if df.at[i - 1, 'in_position']:
                 df.at[i, 'current_stop_loss'] = df.at[i - 1, 'current_stop_loss']
@@ -73,18 +75,18 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                 df.at[i, 'position_id'] = df.at[i - 1, 'position_id']
                 # check for exit
                 signal_direction, signal_index = get_position_direction_and_index(df, i, 'signal_direction', 'in_position')
-                # if signal_direction == 'positive' and df.at[i, 'current_profit_taker'] <= df.at[i, 'Open']:
-                #     df = exit_bullish(df, i, signal_index, 'Open')  # exit open
-                #     continue
-                # if signal_direction == 'positive' and df.at[i, 'current_profit_taker'] <= df.at[i, 'High']:
-                #     df = exit_bullish(df, i, signal_index, 'current_profit_taker')  # exit pt
-                #     continue
-                # if signal_direction == 'positive' and df.at[i, 'current_stop_loss'] >= df.at[i, 'Open']:
-                #     df = exit_bullish(df, i, signal_index, 'Open')  # exit open
-                #     continue
-                # if signal_direction == 'positive' and df.at[i, 'current_stop_loss'] >= df.at[i, 'Low']:
-                #     df = exit_bullish(df, i, signal_index, 'current_stop_loss')  # exit sl
-                #     continue
+                if signal_direction == 'positive' and df.at[i, 'current_profit_taker'] <= df.at[i, 'Open']:
+                    df = exit_bullish(df, i, signal_index, 'Open')  # exit open
+                    continue
+                if signal_direction == 'positive' and df.at[i, 'current_profit_taker'] <= df.at[i, 'High']:
+                    df = exit_bullish(df, i, signal_index, 'current_profit_taker')  # exit pt
+                    continue
+                if signal_direction == 'positive' and df.at[i, 'current_stop_loss'] >= df.at[i, 'Open']:
+                    df = exit_bullish(df, i, signal_index, 'Open')  # exit open
+                    continue
+                if signal_direction == 'positive' and df.at[i, 'current_stop_loss'] >= df.at[i, 'Low']:
+                    df = exit_bullish(df, i, signal_index, 'current_stop_loss')  # exit sl
+                    continue
                 # # TODO: Trying with a constant stop loss of 2.5% - delete if not relevant
                 # if signal_direction == 'positive' and df.at[i, 'entry_price']*0.975 >= df.at[i, 'Open']:
                 #     df = exit_bullish(df, i, signal_index, 'Open')  # exit open
@@ -94,7 +96,7 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                 #     df = exit_bullish(df, i, signal_index, 'current_stop_loss')  # exit sl
                 #     continue
                 # TODO: TIME BASED EXIT - delete if not relevant
-                if signal_direction == 'positive' and (i - signal_index) >= 5:
+                if signal_direction == 'positive' and (current_date.hour >= 16):
                     df = exit_bullish(df, i, signal_index, 'Close', True)  # exit at end of day
                     continue
                 # TODO: TIME BASED EXIT - delete if not relevant. check loss or high profit mid-action length
@@ -138,7 +140,7 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                     df.at[i, 'profit_potential'] = (df.at[i, 'current_profit_taker'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price']
                     df.at[i, 'loss_potential'] = (df.at[i, 'current_stop_loss'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price']
                     if df.at[i, 'current_profit_taker'] - df.at[i, 'entry_price'] >= 2 * (
-                            df.at[i, 'entry_price'] - df.at[i, 'current_stop_loss']):
+                            df.at[i, 'entry_price'] - df.at[i, 'current_stop_loss']) and (current_date.hour < 12) and (current_date.hour == 9 and current_date.minute >= 30 or current_date.hour > 9):
                         # enter position
                         df.at[i, 'in_position'] = True
                         df.at[i, 'signal'] = 'Bullish'
