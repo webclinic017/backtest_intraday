@@ -233,3 +233,15 @@ def get_breakout_column_for_stock(df, breaker_column_name, column_to_break_name,
                 df.at[i, result_column_name] = True
     return df[result_column_name]
 
+
+def get_touch_and_return_above_column_for_stock(df, touching_column_name, column_to_touch_name, result_column_name, last_n_periods_check):
+    df[result_column_name] = False
+    for i in range(len(df)):
+        if i > last_n_periods_check:
+            touching_column_to_column_to_touch_end_state = 'ABOVE' if df.at[i, touching_column_name] > df.at[i, column_to_touch_name] else 'BELOW'
+            touching_column_to_column_to_touch_start_state = 'ABOVE' if df.at[i-last_n_periods_check, touching_column_name] > df.at[i-last_n_periods_check, column_to_touch_name] else 'BELOW'
+            if touching_column_to_column_to_touch_end_state == 'ABOVE' and touching_column_to_column_to_touch_start_state == 'ABOVE':
+                for j in range(i, i-last_n_periods_check, -1):
+                    if df.at[j, touching_column_name] <= df.at[j, column_to_touch_name]:
+                        df.at[i, result_column_name] = True
+    return df[result_column_name]
