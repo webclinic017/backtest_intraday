@@ -100,6 +100,24 @@ async def get_stock_data_trade_daily_alpha_vantage(ticker):
     return ticker, df
 
 
+def retry_read_csv_from_remote(num_retries, url):
+    retries = 1
+    success = False
+    while not success and retries <= num_retries:
+        try:
+            data = retry_get_request(url).content
+            data = pd.read_csv(io.StringIO(data.decode('utf-8')))
+            success = True
+            return data
+        except Exception as e:
+            wait = retries * 3
+            print(f'Error Get Requesting And Reading {url}: {e}')
+            print('Error! Waiting %s secs and re-trying...' % wait)
+            time.sleep(wait)
+            retries += 1
+    return None
+
+
 def get_stock_data_intraday_alpha_vantage(ticker):
     print(ticker)
     api_key = open(key_path, 'r').read()
@@ -107,19 +125,15 @@ def get_stock_data_intraday_alpha_vantage(ticker):
     aggregated_df = pd.DataFrame()
     for i in range(1, 25):
         print(f'month {i}')
-        data = retry_get_request(f'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY_EXTENDED&symbol={ticker}&apikey={api_key}&interval=5min&slice=year{1 if i <= 12 else 2}month{i if i <= 12 else i - 12}&outputsize=full').content
 
+        data = retry_read_csv_from_remote(10, f'https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY_EXTENDED&symbol={ticker}&apikey={api_key}&interval=5min&slice=year{1 if i <= 12 else 2}month{i if i <= 12 else i - 12}&outputsize=full')
         if data is None:
-            continue
-        data = pd.read_csv(io.StringIO(data.decode('utf-8')))
-        if 'close' not in data:
-            continue
+            return None
         # data = data.set_index('time')
         # data.index = pd.to_datetime(data.index)
         # data = data.between_time('9:30', '16:00')
         # data = data.reset_index()
         aggregated_df = aggregated_df.append(data)
-        time.sleep(0.2)
     if aggregated_df is None:
         return None
     if 'close' not in aggregated_df:
@@ -156,6 +170,7 @@ def get_data_dict_for_multiple_stocks(tickers, time_module):
     for ticker in tickers:
         ohlc_intraday[ticker] = get_stock_data_intraday_alpha_vantage(ticker)
         ohlc_intraday[ticker]['is_earning_days'] = ''  # TODO: once I get how to catch and retry, add the earnings back!
+        ohlc_intraday[ticker].to_csv(f'stocks_csvs_raw/{ticker}.csv', index=False)
 
     return ohlc_intraday
 
@@ -167,7 +182,7 @@ def get_data_dict_for_all_stocks_in_directory(directory_str):
     for file in os.listdir(directory):
         filename = os.fsdecode(file)
         if filename.endswith(".csv") and filename[0].isupper():
-            ticker = filename.split('_')[0]
+            ticker = filename.split('.csv')[0].split('_')[0]
             print(f'pulling ticker csv {ticker}')
             stock_df = pd.read_csv(directory_str + '/' + filename)
             ohlc_intraday[ticker] = stock_df[['Date','Open','High','Low','Close','Volume','is_earning_days']]
