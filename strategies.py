@@ -102,9 +102,9 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                 #     df = exit_bullish(df, i, signal_index, 'current_stop_loss')  # exit sl
                 #     continue
                 # TODO: TIME BASED EXIT - delete if not relevant
-                # if signal_direction == 'positive' and (current_date.hour >= 16):
-                #     df = exit_bullish(df, i, signal_index, 'Close', True)  # exit at end of day
-                #     continue
+                if signal_direction == 'positive' and (current_date.hour >= 16):
+                    df = exit_bullish(df, i, signal_index, 'Close', True)  # exit at end of day
+                    continue
                 # TODO: TIME BASED EXIT - delete if not relevant. check loss or high profit mid-action length
                 # if signal_direction == 'positive' and (i - signal_index) >= 3 and (df.at[i, 'Close'] < df.at[i, 'entry_price'] or (df.at[i, 'Close'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price'] > 0.025):
                 #     df = exit_bullish(df, i, signal_index, 'Close', True)  # exit at end of day
@@ -138,8 +138,9 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                         df.at[i, 'current_profit_taker'] = df.at[i, 'current_profit_taker'] - df.at[i, 'atr']
             # if not in position
             elif not df.at[i - 1, 'in_position']:
-                if df.at[i, '50_ma_volume'] < 13000: # enter only positions where 50_ma_volume is higher than 13,000$
-                    continue
+                # TODO: enter only high volume positions. delete if irrelevant
+                # if df.at[i, '50_ma_volume'] < 13000: # enter only positions where 50_ma_volume is higher than 13,000$
+                #     continue
                 # check if i should enter a bullish position
                 if df.at[i, 'signal_direction'] == 'positive':
                     df.at[i, 'entry_price'] = df.at[i, 'Close']

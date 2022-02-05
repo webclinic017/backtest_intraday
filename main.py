@@ -308,10 +308,10 @@ def read_splitted_stocks_dfs():
     return splitted_stocks_dict
 
 
-# all_splitted_stocks_dict = split_dfs_for_all_tickers(stocks_dict, adjusted_tickers)
-# all_splitted_stocks_dict = apply_features_for_splitted_stocks_dict(all_splitted_stocks_dict, adjusted_tickers)
+all_splitted_stocks_dict = split_dfs_for_all_tickers(stocks_dict, adjusted_tickers)
+all_splitted_stocks_dict = apply_features_for_splitted_stocks_dict(all_splitted_stocks_dict, adjusted_tickers)
 
-all_splitted_stocks_dict = read_splitted_stocks_dfs()
+# all_splitted_stocks_dict = read_splitted_stocks_dfs()
 
 combined_train_dfs_for_all_stocks_by_index = combine_dfs_for_all_stocks_by_index(all_splitted_stocks_dict, 'train_dfs', adjusted_tickers)
 combined_test_dfs_for_all_stocks_by_index = combine_dfs_for_all_stocks_by_index(all_splitted_stocks_dict, 'test_dfs', adjusted_tickers)
