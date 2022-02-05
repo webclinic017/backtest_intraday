@@ -217,10 +217,23 @@ def get_beta_column(stock_df, benchmark_df, period):
 
 def normalize_columns(df, columns_list):
     temp_df = df.copy()
+    scalers = {}
     for col in columns_list:
-        scaler = MinMaxScaler((-1, 1))
+        scalers[col] = MinMaxScaler((-1, 1))
         temp_df[f'temp_{col}'] = df[col].clip(df[col].quantile(.05), df[col].quantile(.95))
-        temp_df[[col]] = scaler.fit_transform(temp_df[[f'temp_{col}']])
+        scalers[col] = scalers[col].fit(temp_df[[f'temp_{col}']])
+        temp_df[[col]] = scalers[col].transform(temp_df[[f'temp_{col}']])
+        df[f'{col}_norm'] = temp_df[col]
+    return df, scalers
+
+
+def normalize_columns_with_predefined_scaler(df, columns_list, scalers):
+    temp_df = df.copy()
+    if df.empty:
+        return df
+    for col in columns_list:
+        temp_df[f'temp_{col}'] = df[col].clip(df[col].quantile(.05), df[col].quantile(.95))
+        temp_df[[col]] = scalers[col].transform(temp_df[[f'temp_{col}']])
         df[f'{col}_norm'] = temp_df[col]
     return df
 

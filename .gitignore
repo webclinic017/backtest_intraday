@@ -1,3 +1,8 @@
 stocks_csvs_new/
 stocks_csvs_raw/
+stocks_csvs_splits/
+stocks_csvs_raw_backup/
+train_dfs_with_scores/
+train_correls/
+test_dfs_with_scores/
 venv/

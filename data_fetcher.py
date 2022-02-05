@@ -10,6 +10,7 @@ import requests
 import time
 import io
 
+from utils import save_create_csv
 
 key_path = '/Users/yochainusan/PycharmProjects/backtest_multi/config/alpha_vantage/key.txt'
 telegram_key_path = '/Users/yochainusan/PycharmProjects/order_notifier/config/telegram/key.txt'
@@ -155,7 +156,7 @@ def get_data_for_stock(ticker, interval, start_time, time_module):
 
 def add_earnings_dates_to_stock(stock_df, earnings_json):
     df = stock_df.copy()
-    df['is_earning_days'] = ''
+    df['is_earning_days'] = None
     for quarterly_report in earnings_json['quarterlyEarnings']:
         report_date_string = quarterly_report['reportedDate']
         df['is_earning_days'][df['Date'] == report_date_string] = True
@@ -169,9 +170,7 @@ def get_data_dict_for_multiple_stocks(tickers, time_module):
 
     for ticker in tickers:
         ohlc_intraday[ticker] = get_stock_data_intraday_alpha_vantage(ticker)
-        ohlc_intraday[ticker]['is_earning_days'] = ''  # TODO: once I get how to catch and retry, add the earnings back!
-        ohlc_intraday[ticker].to_csv(f'stocks_csvs_raw/{ticker}.csv', index=False)
-
+        save_create_csv('stocks_csvs_raw', ticker, ohlc_intraday[ticker])
     return ohlc_intraday
 
 
@@ -185,6 +184,6 @@ def get_data_dict_for_all_stocks_in_directory(directory_str):
             ticker = filename.split('.csv')[0].split('_')[0]
             print(f'pulling ticker csv {ticker}')
             stock_df = pd.read_csv(directory_str + '/' + filename)
-            ohlc_intraday[ticker] = stock_df[['Date','Open','High','Low','Close','Volume','is_earning_days']]
+            ohlc_intraday[ticker] = stock_df[['Date','Open','High','Low','Close','Volume']]
             tickers.append(ticker)
     return ohlc_intraday, tickers

@@ -49,27 +49,29 @@ def check_early_in_trend(df, signal_column_name, i, signal_value, period_check):
 
 def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_periods, ticker):
     df = stock_df.copy()
-    df['exits'] = ''
-    df['action_return'] = ''
-    df['position_id'] = ''
-    df['action_return_on_signal_index'] = ''
-    df['current_stop_loss'] = ''
-    df['current_profit_taker'] = ''
-    df['entry_price'] = ''
-    df['in_position'] = ''
-    df['signal'] = ''
-    df['action_length'] = ''
-    df['profit_potential'] = ''
-    df['loss_potential'] = ''
-    df['time_based_exit'] = ''
+    df['exits'] = None
+    df['action_return'] = None
+    df['position_id'] = None
+    df['action_return_on_signal_index'] = None
+    df['current_stop_loss'] = None
+    df['current_profit_taker'] = None
+    df['entry_price'] = None
+    df['in_position'] = None
+    df['signal'] = None
+    df['action_length'] = None
+    df['profit_potential'] = None
+    df['loss_potential'] = None
+    df['time_based_exit'] = None
     position_counter = 1
     for i in range(len(df)):
         if i > 1:
-            try:
-                current_date = datetime.strptime(df.at[i, 'Date'], '%Y-%m-%d %H:%M:%S')
-            except Exception as e:
-                print(f'could not apply algorithm for {ticker} because of index {i} with error {e}')
-                continue
+            current_date = df.at[i, 'Date']
+            # TODO: Had these lines converting a string to date, but currently having a timestamp there so maybe i dont need these lines anyway
+            # try:
+            #     current_date = datetime.strptime(df.at[i, 'Date'], '%Y-%m-%d %H:%M:%S')
+            # except Exception as e:
+            #     print(f'could not apply algorithm for {ticker} because of index {i} with error {e}')
+            #     continue
             # check in position
             if df.at[i - 1, 'in_position']:
                 df.at[i, 'current_stop_loss'] = df.at[i - 1, 'current_stop_loss']
@@ -156,7 +158,7 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                         df.at[i, 'in_position'] = False
                     continue
                 # check if i should enter a bearish position
-                if df.at[i, 'signal_direction'] == 'negative' and check_not_earnings_days(df, i):
+                if df.at[i, 'signal_direction'] == 'negative':
                     df.at[i, 'entry_price'] = df['Close'][i]
                     df.at[i, 'current_profit_taker'] = df['Low'].rolling(int(prev_max_min_periods / 2)).min()[i]
                     df.at[i, 'current_stop_loss'] = df.at[i, 'entry_price'] + df.at[i, 'atr']
