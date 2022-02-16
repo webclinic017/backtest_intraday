@@ -5,4 +5,6 @@ stocks_csvs_raw_backup/
 train_dfs_with_scores/
 train_correls/
 test_dfs_with_scores/
+intraday_backtest_backups/
+full_stocks_csvs_with_features/
 venv/

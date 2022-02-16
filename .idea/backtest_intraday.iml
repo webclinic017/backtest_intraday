@@ -5,6 +5,8 @@
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/stocks_csvs_new" />
       <excludeFolder url="file://$MODULE_DIR$/stocks_csvs_raw" />
+      <excludeFolder url="file://$MODULE_DIR$/intraday_backtest_backups" />
+      <excludeFolder url="file://$MODULE_DIR$/full_stocks_csvs_with_features" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

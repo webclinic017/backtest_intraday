@@ -52,15 +52,16 @@ def split_df_to_train_test_sets(df, train_size_weeks, test_size_weeks):
     # check for datetime index, if not change it
     if not isinstance(df, pd.DatetimeIndex):
         df['Date'] = pd.to_datetime(df['Date'], format ='%Y-%m-%d %H:%M:%S')
-    one_day_df_group = df.groupby(pd.Grouper(key='Date', freq='W'))
-    dfs = [one_day_df for _, one_day_df in one_day_df_group]
+    one_week_df_group = df.groupby(pd.Grouper(key='Date', freq='W'))
+    dfs = [one_week_df for _, one_week_df in one_week_df_group]
 
     resulting_train_dfs = []
     resulting_test_dfs = []
     while len(dfs) >= train_size_weeks:
         current_train_df_merged = pd.concat(dfs[:train_size_weeks])
         resulting_train_dfs.append(current_train_df_merged)
-        resulting_test_dfs.extend(dfs[train_size_weeks:train_size_weeks + test_size_weeks])
+        current_test_df_merged = pd.concat(dfs[train_size_weeks:train_size_weeks + test_size_weeks])
+        resulting_test_dfs.append(current_test_df_merged)
         del dfs[:test_size_weeks]
 
     return resulting_train_dfs, resulting_test_dfs
@@ -125,6 +126,8 @@ def get_all_actions_df(df):
 
 
 def get_correls_on_norm_columns(df, cols):
+    if df.empty:
+        return {}
     copied_df = df.copy()
     corr_dict = {}
     copied_df = copied_df.replace(r'^\s*$', np.NaN, regex=True)
@@ -164,12 +167,27 @@ def apply_features_for_dfs(dfs_list, ticker, data_group, with_actions=False):
     return dfs_list
 
 
+def apply_actions_for_dfs(dfs_list, ticker, data_group):
+    # data_group = 'train_dfs' / 'test_dfs'
+    for current_index in range(len(dfs_list)):
+        print(f'applying actions for {ticker}, current df index {current_index}')
+        dfs_list[current_index].index.name = 'original_index'
+        dfs_list[current_index] = dfs_list[current_index].reset_index()
+        dfs_list[current_index] = calculate_returns_for_df(dfs_list[current_index], 70, ticker)
+        if data_group == 'train_dfs':
+            save_create_csv('stocks_csvs_splits', f'{ticker}_train_{current_index}',  dfs_list[current_index])
+        elif data_group == 'test_dfs':
+            save_create_csv('stocks_csvs_splits', f'{ticker}_test_{current_index}',  dfs_list[current_index])
+    return dfs_list
+
+
 def split_dfs_for_all_tickers(stocks_dict, tickers):
     splitted_stocks_dict = {}
     for ticker in tickers:
         print(f'splitting ticker: {ticker}')
         splitted_stocks_dict[ticker] = {}
-        splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 8, 1)
+        # splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 8, 1)
+        splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 10, 3)
     return splitted_stocks_dict
 
 
@@ -178,6 +196,14 @@ def apply_features_for_splitted_stocks_dict(splitted_stocks_dict, tickers):
         print(f'applying features for splitted ticker: {ticker}')
         splitted_stocks_dict[ticker]['train_dfs'] = apply_features_for_dfs(splitted_stocks_dict[ticker]['train_dfs'], ticker, data_group='train_dfs', with_actions=True)
         splitted_stocks_dict[ticker]['test_dfs'] = apply_features_for_dfs(splitted_stocks_dict[ticker]['test_dfs'], ticker, data_group='test_dfs', with_actions=True)
+    return splitted_stocks_dict
+
+
+def apply_actions_for_splitted_stocks_dict(splitted_stocks_dict, tickers):
+    for ticker in tickers:
+        print(f'applying features for splitted ticker: {ticker}')
+        splitted_stocks_dict[ticker]['train_dfs'] = apply_actions_for_dfs(splitted_stocks_dict[ticker]['train_dfs'], ticker, data_group='train_dfs')
+        splitted_stocks_dict[ticker]['test_dfs'] = apply_actions_for_dfs(splitted_stocks_dict[ticker]['test_dfs'], ticker, data_group='test_dfs')
     return splitted_stocks_dict
 
 
@@ -286,8 +312,6 @@ def get_best_correls_df(correls_df):
     return correls_df[column_names_above_avg_abs]
 
 
-
-
 def read_splitted_stocks_dfs():
     print('reading splitted stocks from files')
     splitted_stocks_dict = {}
@@ -308,23 +332,37 @@ def read_splitted_stocks_dfs():
     return splitted_stocks_dict
 
 
-all_splitted_stocks_dict = split_dfs_for_all_tickers(stocks_dict, adjusted_tickers)
-all_splitted_stocks_dict = apply_features_for_splitted_stocks_dict(all_splitted_stocks_dict, adjusted_tickers)
+def apply_features_for_stocks(all_stocks_dict, tickers):
+    for ticker in tickers:
+        print(f'applying features for full stock {ticker}')
+        all_stocks_dict[ticker] = get_indicators_for_df(all_stocks_dict[ticker], ticker)
+        all_stocks_dict[ticker] = get_signals_for_df(all_stocks_dict[ticker], ticker)
+        save_create_csv('full_stocks_csvs_with_features', f'{ticker}',  all_stocks_dict[ticker])
+    return all_stocks_dict
+
+
+# TODO: There is a problem here with short length dfs - many lengthy features wont exist. so need to first apply the features and then split. FIXED
+# all_splitted_stocks_dict = split_dfs_for_all_tickers(stocks_dict, adjusted_tickers)
+# all_splitted_stocks_dict = apply_features_for_splitted_stocks_dict(all_splitted_stocks_dict, adjusted_tickers)
 
 # all_splitted_stocks_dict = read_splitted_stocks_dfs()
 
+all_stocks_dict_with_features = apply_features_for_stocks(stocks_dict, adjusted_tickers)
+all_stocks_dict_with_features_splitted = split_dfs_for_all_tickers(all_stocks_dict_with_features, adjusted_tickers)
+all_splitted_stocks_dict = apply_actions_for_splitted_stocks_dict(all_stocks_dict_with_features_splitted, adjusted_tickers)
+
 combined_train_dfs_for_all_stocks_by_index = combine_dfs_for_all_stocks_by_index(all_splitted_stocks_dict, 'train_dfs', adjusted_tickers)
 combined_test_dfs_for_all_stocks_by_index = combine_dfs_for_all_stocks_by_index(all_splitted_stocks_dict, 'test_dfs', adjusted_tickers)
-all_actions_train_dfs = get_all_actions_dfs_list(combined_train_dfs_for_all_stocks_by_index)
 columns_to_normalize = ['Volume', '10_ma_volume', '20_ma_volume', '50_ma_volume',
                             # '10_beta_SPY', '50_beta_SPY',
                             'median_ratio', 'ma_med_5_ratio',
                             'ma_med_34_ratio', 'awesome_osc', 'macd', 'macd_signal',
                             'distance_from_10_ma', 'adx', '+di', '-di', 'rsi', 'stochastic_k',
                             'stochastic_d', 'atr_volatility', 'atr_volatility_ma']
-normalized_train_dfs, train_scalers = normalize_dfs(all_actions_train_dfs, columns_to_normalize)
-only_entrances_train_dfs = get_only_entrances_dfs_list(normalized_train_dfs)
-correls_dicts_for_train_dfs = get_correls_dicts_for_train_dfs(normalized_train_dfs, columns_to_normalize)
+normalized_train_dfs, train_scalers = normalize_dfs(combined_train_dfs_for_all_stocks_by_index, columns_to_normalize)
+all_actions_train_dfs = get_all_actions_dfs_list(normalized_train_dfs)
+only_entrances_train_dfs = get_only_entrances_dfs_list(all_actions_train_dfs)
+correls_dicts_for_train_dfs = get_correls_dicts_for_train_dfs(only_entrances_train_dfs, columns_to_normalize)
 all_train_correls_df = get_all_correls_df(correls_dicts_for_train_dfs)
 best_train_correls_df = get_best_correls_df(all_train_correls_df)
 normalized_train_dfs_with_scores = calculate_correl_score_series_for_dfs(only_entrances_train_dfs, best_train_correls_df)
