@@ -27,7 +27,8 @@ from utils import save_create_csv
 # adjusted_tickers = [elem for elem in tickers if elem != 'GOOG' and elem != 'DUK' and elem != 'HLT' and elem != 'DD' and elem != 'CMCSA' and elem != 'COG' and elem != 'WBA' and elem != 'KMX' and elem != 'ADP' and elem != 'STZ' and elem != 'IQV' and elem != 'BBWI' and elem != 'CTRA'] # there were stock splits
 # adjusted_tickers = [elem for elem in adjusted_tickers if '.' not in elem]
 
-adjusted_tickers = ['FB', 'AAPL', 'SPY', 'IWM', 'QQQ', 'AMZN', 'TSLA']
+# adjusted_tickers = ['FB', 'AAPL', 'SPY', 'IWM', 'QQQ', 'AMZN', 'TSLA', 'GOOGL', 'AAL', 'WYNN', 'MMM', 'DIS', 'NFLX', 'AMD', 'INTL', 'MS', 'IVZ', 'AZO', 'IT', 'T', 'VZ', 'QCOM', 'MGM', 'BLK', 'NVDA', 'PYPL', 'MRNA', 'TEVA', 'XLF', 'XLE', 'XLU', 'JPM', 'V', 'BAC', 'TSM', 'JNJ', 'WMT']
+adjusted_tickers = ['SPY', 'IWM', 'QQQ', 'XLF', 'XLE', 'XLU']
 
 # adjusted_tickers = adjusted_tickers + ['SPY', 'QQQ', 'IWM']
 
@@ -57,7 +58,7 @@ def split_df_to_train_test_sets(df, train_size_weeks, test_size_weeks):
 
     resulting_train_dfs = []
     resulting_test_dfs = []
-    while len(dfs) >= train_size_weeks:
+    while len(dfs) > train_size_weeks:
         current_train_df_merged = pd.concat(dfs[:train_size_weeks])
         resulting_train_dfs.append(current_train_df_merged)
         current_test_df_merged = pd.concat(dfs[train_size_weeks:train_size_weeks + test_size_weeks])
@@ -116,7 +117,9 @@ def get_signals_for_df(df, ticker):
 
 
 def calculate_returns_for_df(df, n_prev_periods_check, ticker_name):
-    df = calculate_exits_column_by_atr_and_prev_max_min(df, n_prev_periods_check, ticker_name)
+    # TODO: toggle comment between these 2 lines for daily/intraday data
+    df = calculate_exits_column_by_atr_and_prev_max_min(df, n_prev_periods_check, ticker_name, 'intraday')
+    # df = calculate_exits_column_by_atr_and_prev_max_min(df, n_prev_periods_check, ticker_name, 'daily')
     return df
 
 
@@ -126,7 +129,7 @@ def get_all_actions_df(df):
 
 
 def get_correls_on_norm_columns(df, cols):
-    if df.empty:
+    if df.empty or len(df) < 5:
         return {}
     copied_df = df.copy()
     corr_dict = {}
@@ -186,8 +189,8 @@ def split_dfs_for_all_tickers(stocks_dict, tickers):
     for ticker in tickers:
         print(f'splitting ticker: {ticker}')
         splitted_stocks_dict[ticker] = {}
-        # splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 8, 1)
-        splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 10, 3)
+        splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 8, 1)
+        # splitted_stocks_dict[ticker]['train_dfs'], splitted_stocks_dict[ticker]['test_dfs'] = split_df_to_train_test_sets(stocks_dict[ticker], 52, 12)
     return splitted_stocks_dict
 
 
@@ -259,9 +262,10 @@ def normalize_dfs_with_predefined_scalers(df_list, columns_to_normalize, scalers
 
 def get_all_correls_df(correls_dicts):
     all_correls_dict = {}
-    for key, value in correls_dicts[0].items():
-        all_correls_dict[key] = []
-        for dicts_index in range(len(correls_dicts)):
+    for dicts_index in range(len(correls_dicts)):
+        for key, value in correls_dicts[dicts_index].items():
+            if key not in all_correls_dict:
+                all_correls_dict[key] = []
             all_correls_dict[key].append(correls_dicts[dicts_index][key])
     all_correls_df = pd.DataFrame.from_dict(all_correls_dict)
     save_create_csv('train_correls', 'all_train_correls', all_correls_df.reset_index())
@@ -282,8 +286,8 @@ def get_df_without_norm_columns(df):
     return df[df_columns_without_norms]
 
 
-def calculate_correl_score_series_for_dfs(df_list, best_correls_df):
-    # data_group could by 'train'/'test'
+def calculate_correl_score_series_for_dfs(df_list, best_correls_df, data_group):
+    # data_group could be 'train'/'test'
     dfs_with_scores = []
     print(f'getting all correls scores for dfs')
     for current_index in range(len(df_list)):
@@ -293,7 +297,10 @@ def calculate_correl_score_series_for_dfs(df_list, best_correls_df):
             continue
         current_df_with_scores = calculate_correl_score_series_for_df(df_list[current_index], best_correls_df.to_dict('records')[current_index])
         current_df_with_scores['df_index'] = current_index
-        save_create_csv('train_dfs_with_scores', f'train_df_{current_index}', get_df_without_norm_columns(current_df_with_scores))
+        if data_group == 'train':
+            save_create_csv('train_dfs_with_scores', f'train_df_{current_index}', get_df_without_norm_columns(current_df_with_scores))
+        # elif data_group == 'test':
+        #     save_create_csv('test_dfs_with_scores', f'test_df_{current_index}', get_df_without_norm_columns(current_df_with_scores))
         dfs_with_scores.append(current_df_with_scores)
     return dfs_with_scores
 
@@ -365,7 +372,7 @@ only_entrances_train_dfs = get_only_entrances_dfs_list(all_actions_train_dfs)
 correls_dicts_for_train_dfs = get_correls_dicts_for_train_dfs(only_entrances_train_dfs, columns_to_normalize)
 all_train_correls_df = get_all_correls_df(correls_dicts_for_train_dfs)
 best_train_correls_df = get_best_correls_df(all_train_correls_df)
-normalized_train_dfs_with_scores = calculate_correl_score_series_for_dfs(only_entrances_train_dfs, best_train_correls_df)
+normalized_train_dfs_with_scores = calculate_correl_score_series_for_dfs(only_entrances_train_dfs, best_train_correls_df, 'train')
 
 all_trains_df_with_scores = pd.concat(normalized_train_dfs_with_scores)
 save_create_csv('train_dfs_with_scores', 'all_trains_df_with_scores', all_trains_df_with_scores)
@@ -373,7 +380,7 @@ save_create_csv('train_dfs_with_scores', 'all_trains_df_with_scores', all_trains
 all_actions_test_dfs = get_all_actions_dfs_list(combined_test_dfs_for_all_stocks_by_index)
 normalized_test_dfs = normalize_dfs_with_predefined_scalers(all_actions_test_dfs, columns_to_normalize, train_scalers)
 only_entrances_test_dfs = get_only_entrances_dfs_list(normalized_test_dfs)
-normalized_test_dfs_with_scores = calculate_correl_score_series_for_dfs(only_entrances_test_dfs, best_train_correls_df)
+normalized_test_dfs_with_scores = calculate_correl_score_series_for_dfs(only_entrances_test_dfs, best_train_correls_df, 'test')
 
 for current_index in range(len(normalized_test_dfs_with_scores)):
     save_create_csv('test_dfs_with_scores', f'test_df_{current_index}',

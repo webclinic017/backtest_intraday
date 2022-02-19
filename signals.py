@@ -131,9 +131,9 @@ def awesome_oscilator(stock_df, signal_direction_column, signal_type_column):
             if df['awesome_osc'][i-1] > 0 and df['awesome_osc'][i] > df['awesome_osc'][i-1] and (df.loc[i-8 : i-2, 'awesome_osc'] < 0).all() and check_awesome_osc_twin_peaks_in_negative_zone(df, i-1, 80):
                 df.at[i, signal_direction_column] = 'positive'
                 df.at[i, signal_type_column] = 'awesome_osc'
-            # elif df['awesome_osc'][i] < 0 and df['awesome_osc'][i-1] >= 0 and check_awesome_osc_twin_peaks_in_positive_zone(df, i, 80):
-            #     df[signal_direction_column][i] = 'negative'
-            #     df[signal_type_column][i] = 'awesome_osc'
+            elif df['awesome_osc'][i-1] < 0 and df['awesome_osc'][i] < df['awesome_osc'][i-1] and (df.loc[i-8 : i-2, 'awesome_osc'] > 0).all() and check_awesome_osc_twin_peaks_in_positive_zone(df, i-1, 80):
+                df.at[i, signal_direction_column] = 'positive'
+                df.at[i, signal_type_column] = 'awesome_osc'
     return df
 
 

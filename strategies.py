@@ -47,7 +47,8 @@ def check_early_in_trend(df, signal_column_name, i, signal_value, period_check):
     return False
 
 
-def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_periods, ticker):
+def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_periods, ticker, time_period='intraday'):
+    # time_period = 'intraday' / 'daily'
     df = stock_df.copy()
     df['exits'] = None
     df['action_return'] = None
@@ -102,9 +103,10 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                 #     df = exit_bullish(df, i, signal_index, 'current_stop_loss')  # exit sl
                 #     continue
                 # TODO: TIME BASED EXIT - delete if not relevant
-                if signal_direction == 'positive' and (current_date.hour >= 16):
-                    df = exit_bullish(df, i, signal_index, 'Close', True)  # exit at end of day
-                    continue
+                if signal_direction == 'positive':
+                    if (time_period == 'intraday' and current_date.hour >= 16) or (time_period == 'daily' and (i - signal_index) >= 5):
+                        df = exit_bullish(df, i, signal_index, 'Close', True)
+                        continue
                 # TODO: TIME BASED EXIT - delete if not relevant. check loss or high profit mid-action length
                 # if signal_direction == 'positive' and (i - signal_index) >= 3 and (df.at[i, 'Close'] < df.at[i, 'entry_price'] or (df.at[i, 'Close'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price'] > 0.025):
                 #     df = exit_bullish(df, i, signal_index, 'Close', True)  # exit at end of day
@@ -144,24 +146,27 @@ def calculate_exits_column_by_atr_and_prev_max_min(stock_df, prev_max_min_period
                 # check if i should enter a bullish position
                 if df.at[i, 'signal_direction'] == 'positive':
                     df.at[i, 'entry_price'] = df.at[i, 'Close']
-                    df.at[i, 'current_profit_taker'] = max(df['High'].rolling(prev_max_min_periods).max()[i], df.at[i, 'entry_price'] + df.at[i, 'atr'] * 2)
-                    df.at[i, 'current_stop_loss'] = min(df['Low'].rolling(5).min()[i], df.at[i, 'entry_price'] - df.at[i, 'atr'])
+                    df.at[i, 'current_profit_taker'] = max(df['High'].rolling(prev_max_min_periods, 0).max()[i], df.at[i, 'entry_price'] + df.at[i, 'atr'] * 2)
+                    df.at[i, 'current_stop_loss'] = min(df['Low'].rolling(5, 0).min()[i], df.at[i, 'entry_price'] - df.at[i, 'atr'])
                     df.at[i, 'profit_potential'] = (df.at[i, 'current_profit_taker'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price']
                     df.at[i, 'loss_potential'] = (df.at[i, 'current_stop_loss'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price']
                     if df.at[i, 'current_profit_taker'] - df.at[i, 'entry_price'] >= 2 * (
-                            df.at[i, 'entry_price'] - df.at[i, 'current_stop_loss']) and (current_date.hour < 12) and (current_date.hour == 9 and current_date.minute >= 30 or current_date.hour > 9):
-                        # enter position
-                        df.at[i, 'in_position'] = True
-                        df.at[i, 'signal'] = 'Bullish'
-                        df.at[i, 'position_id'] = f'{position_counter}_{ticker}'
-                        position_counter += 1
+                            df.at[i, 'entry_price'] - df.at[i, 'current_stop_loss']):
+                        if (time_period == 'intraday' and (current_date.hour < 12) and (current_date.hour == 9 and current_date.minute >= 30 or current_date.hour > 9)) or time_period == 'daily':
+                            # enter position
+                            df.at[i, 'in_position'] = True
+                            df.at[i, 'signal'] = 'Bullish'
+                            df.at[i, 'position_id'] = f'{position_counter}_{ticker}'
+                            position_counter += 1
+                        else:
+                            df.at[i, 'in_position'] = False
                     else:
                         df.at[i, 'in_position'] = False
                     continue
                 # check if i should enter a bearish position
                 if df.at[i, 'signal_direction'] == 'negative':
-                    df.at[i, 'entry_price'] = df['Close'][i]
-                    df.at[i, 'current_profit_taker'] = df['Low'].rolling(int(prev_max_min_periods / 2)).min()[i]
+                    df.at[i, 'entry_price'] = df.at[i, 'Close']
+                    df.at[i, 'current_profit_taker'] = df['Low'].rolling(int(prev_max_min_periods / 2), 0).min()[i]
                     df.at[i, 'current_stop_loss'] = df.at[i, 'entry_price'] + df.at[i, 'atr']
                     df.at[i, 'profit_potential'] = abs(df.at[i, 'current_profit_taker'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price']
                     df.at[i, 'loss_potential'] = -(df.at[i, 'current_stop_loss'] - df.at[i, 'entry_price']) / df.at[i, 'entry_price']

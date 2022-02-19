@@ -74,7 +74,7 @@ def get_stock_data_trade_daily_alpha_vantage_csv(ticker):
     data = data[['timestamp', 'open', 'high', 'low', 'close', 'adjusted_close', 'volume']]
     data.columns = ["Date", "Open","High","Low","Close","Adjusted_Close","Volume"]
     data = data.iloc[::-1].reset_index(drop=True)
-    data = data.iloc[-(252*4):].reset_index(drop=True) # TODO: 4 years of data
+    data = data.iloc[-(252*8):].reset_index(drop=True) # TODO: 4 years of data
     df = convert_columns_to_adjusted(data)
     # time.sleep(0.4 - ((time.time() - start_time) % 0.4))
     return df
@@ -170,8 +170,8 @@ def get_data_dict_for_multiple_stocks(tickers, time_module):
 
     for ticker in tickers:
         # TODO: toggle comment between these 2 lines for daily/intraday data
-        # ohlc_intraday[ticker] = get_stock_data_intraday_alpha_vantage(ticker)
-        ohlc_intraday[ticker] = get_stock_data_trade_daily_alpha_vantage_csv(ticker)
+        ohlc_intraday[ticker] = get_stock_data_intraday_alpha_vantage(ticker)
+        # ohlc_intraday[ticker] = get_stock_data_trade_daily_alpha_vantage_csv(ticker)
         save_create_csv('stocks_csvs_raw', ticker, ohlc_intraday[ticker])
     return ohlc_intraday
 
