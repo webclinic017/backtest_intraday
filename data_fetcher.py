@@ -189,3 +189,14 @@ def get_data_dict_for_all_stocks_in_directory(directory_str):
             ohlc_intraday[ticker] = stock_df[['Date','Open','High','Low','Close','Volume']]
             tickers.append(ticker)
     return ohlc_intraday, tickers
+
+
+def get_dfs_for_all_csvs_in_directory(directory_str):
+    directory = os.fsencode(directory_str)
+    df_list = []
+    for file in os.listdir(directory):
+        filename = os.fsdecode(file)
+        if filename.endswith(".csv"):
+            df = pd.read_csv(directory_str + '/' + filename)
+            df_list.append(df)
+    return df_list

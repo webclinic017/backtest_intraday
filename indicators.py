@@ -97,6 +97,16 @@ def get_basic_renko(stock_df, period):
     df_to_merge["bar_num"].fillna(method='ffill',inplace=True)
     return df_to_merge['bar_num']
 
+
+def simple_slope(df, col_name, period):
+    df_copy = df.copy()
+    df_copy['slope'] = 0
+    for i in range(len(df)):
+        if i > period:
+            df_copy['slope'][i] = (df[col_name][i] - df[col_name][i-period+1]) / (period - 1)
+    return df_copy['slope']
+
+
 def slope(series, period):
     "function to calculate the slope of n consecutive points on a plot"
     slopes = [i*0 for i in range(period-1)]

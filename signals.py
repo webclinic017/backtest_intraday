@@ -132,8 +132,134 @@ def awesome_oscilator(stock_df, signal_direction_column, signal_type_column):
                 df.at[i, signal_direction_column] = 'positive'
                 df.at[i, signal_type_column] = 'awesome_osc'
             elif df['awesome_osc'][i-1] < 0 and df['awesome_osc'][i] < df['awesome_osc'][i-1] and (df.loc[i-8 : i-2, 'awesome_osc'] > 0).all() and check_awesome_osc_twin_peaks_in_positive_zone(df, i-1, 80):
-                df.at[i, signal_direction_column] = 'positive'
+                df.at[i, signal_direction_column] = 'negative'
                 df.at[i, signal_type_column] = 'awesome_osc'
+    return df
+
+
+def check_mas_widening(df, small_ma_col, mid_ma_col, large_ma_col, index_end, index_start):
+    last_distance = 0
+    for i in range(index_start, index_end + 1):
+        current_distance = abs((df[mid_ma_col][i] - df[large_ma_col][i]) / df[mid_ma_col][i])
+        if current_distance < last_distance:
+            return False
+        last_distance = current_distance
+    return True
+
+
+def check_bullish_mas(df, small_ma_col, mid_ma_col, large_ma_col, index_end, index_start):
+    flag = False
+    for i in range(index_start, index_end+1):
+        if df[small_ma_col][i] > df[mid_ma_col][i] and df[small_ma_col][i] > df[large_ma_col][i]:
+            flag = True
+        else:
+            return False
+    return flag
+
+
+def check_bearish_mas(df, small_ma_col, mid_ma_col, large_ma_col, index_end, index_start):
+    flag = False
+    for i in range(index_start, index_end + 1):
+        if df[small_ma_col][i] < df[mid_ma_col][i] and df[small_ma_col][i] < df[large_ma_col][i]:
+            flag = True
+        else:
+            return False
+    return flag
+
+
+def check_bullish_mas_slopes(df, small_ma_slope_col, mid_ma_slope_col, large_ma_slope_col, index_end, index_start):
+    flag = False
+    for i in range(index_start, index_end + 1):
+        if df.at[i, mid_ma_slope_col] > 0 and df.at[i, large_ma_slope_col] > 0:
+            flag = True
+        else:
+            return False
+    return flag
+
+
+def check_bearish_mas_slopes(df, small_ma_slope_col, mid_ma_slope_col, large_ma_slope_col, index_end, index_start):
+    flag = False
+    for i in range(index_start, index_end + 1):
+        if df.at[i, mid_ma_slope_col] < 0 and df.at[i, large_ma_slope_col] < 0:
+            flag = True
+        else:
+            return False
+    return flag
+
+
+# def check_bullish_mas(df, small_ma_col, mid_ma_col, large_ma_col, index):
+#     return df[small_ma_col][index] > df[mid_ma_col][index] and df[small_ma_col][index] > df[large_ma_col][index]
+#
+#
+# def check_bearish_mas(df, small_ma_col, mid_ma_col, large_ma_col, index):
+#     return df[small_ma_col][index] < df[mid_ma_col][index] and df[small_ma_col][index] < df[large_ma_col][index]
+#
+#
+# def check_bullish_mas_slopes(df, small_ma_slope_col, large_ma_slope_col, index):
+#     return df.at[index, small_ma_slope_col] > 0 and df.at[index, large_ma_slope_col] > 0
+#
+#
+# def check_bearish_mas_slopes(df, small_ma_slope_col, large_ma_slope_col, index):
+#     return df.at[index, small_ma_slope_col] < 0 and df.at[index, large_ma_slope_col] < 0
+
+
+# def crossing_mas(stock_df, signal_direction_column, signal_type_column):
+#     df = stock_df.copy()
+#     for i in range(len(df)):
+#         if i > 1:
+#             if check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i) and check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i-1) and check_bullish_mas_slopes(df, '5_ma_slope', '13_ma_slope', i):
+#                 df.at[i, signal_direction_column] = 'positive'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#             elif check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i) and not check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i-1) or (df.at[i, '5_ma_slope'] > 0 and df.at[i, '13_ma_slope'] > 0):
+#                 df.at[i, signal_direction_column] = 'end_negative'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#             elif check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i) and check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i-1) and check_bearish_mas_slopes(df, '5_ma_slope', '13_ma_slope', i):
+#                 df.at[i, signal_direction_column] = 'negative'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#             elif check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i) and not check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i-1) or (df.at[i, '5_ma_slope'] < 0 and df.at[i, '13_ma_slope'] < 0):
+#                 df.at[i, signal_direction_column] = 'end_positive'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#     return df
+
+
+# def crossing_mas(stock_df, signal_direction_column, signal_type_column):
+#     df = stock_df.copy()
+#     for i in range(len(df)):
+#         if i > 10:
+#             if check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i, i-5) and check_bullish_mas_slopes(df, '5_ma_slope', '13_ma_slope', i, i-5):
+#                 df.at[i, signal_direction_column] = 'positive'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#             elif check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i-2, i-7) and (not check_bullish_mas(df, '5_ma', '8_ma', '13_ma', i, i-1) or not check_bullish_mas_slopes(df, '5_ma_slope', '13_ma_slope', i, i-1)):
+#                 df.at[i, signal_direction_column] = 'end_positive'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#             elif check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i, i-5) and check_bearish_mas_slopes(df, '5_ma_slope', '13_ma_slope', i, i-5):
+#                 df.at[i, signal_direction_column] = 'negative'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#             elif check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i-2, i-7) and (not check_bearish_mas(df, '5_ma', '8_ma', '13_ma', i, i-1) or not check_bearish_mas_slopes(df, '5_ma_slope', '13_ma_slope', i, i-1)):
+#                 df.at[i, signal_direction_column] = 'end_negative'
+#                 df.at[i, signal_type_column] = 'crossing_mas'
+#     return df
+
+
+def crossing_mas(stock_df, signal_direction_column, signal_type_column):
+    df = stock_df.copy()
+    for i in range(len(df)):
+        if i > 10:
+            # separate to types of moves
+            # 2 larger slopes in the same direction for at least 5 periods is a strong move, it takes only one of them to reverse in order to exit
+            # another move is mas are pretty close together for at least 5 periods, then break - mas are bullish/bearish for 2 periods (not slopes), same exit here
+            if check_bullish_mas_slopes(df, '5_ma_slope', '8_ma_slope', '13_ma_slope', i, i-5) and not check_mas_widening(df, '5_ma', '8_ma', '13_ma', i, i-5):
+                df.at[i, signal_direction_column] = 'positive'
+                df.at[i, signal_type_column] = 'crossing_mas'
+            # elif check_bullish_mas_slopes(df, '5_ma', '8_ma', '13_ma', i-2, i-10) and not check_bullish_mas_slopes(df, '5_ma_slope', '8_ma_slope', '13_ma_slope', i, i-1):
+            #     df.at[i, signal_direction_column] = 'end_positive'
+            #     df.at[i, signal_type_column] = 'crossing_mas'
+            elif check_bearish_mas_slopes(df, '5_ma_slope', '8_ma_slope', '13_ma_slope', i, i-5) and not check_mas_widening(df, '5_ma', '8_ma', '13_ma', i, i-5):
+                df.at[i, signal_direction_column] = 'negative'
+                df.at[i, signal_type_column] = 'crossing_mas'
+            # elif check_bearish_mas_slopes(df, '5_ma', '8_ma', '13_ma', i-2, i-10) and not check_bearish_mas_slopes(df, '5_ma_slope', '8_ma_slope', '13_ma_slope', i, i-1):
+            #     df.at[i, signal_direction_column] = 'end_negative'
+            #     df.at[i, signal_type_column] = 'crossing_mas'
     return df
 
 
