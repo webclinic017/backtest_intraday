@@ -37,10 +37,14 @@ print(f'{datetime.datetime.now()} : starting main...')
 scheduler = BlockingScheduler()
 
 
-def scheduled_job():
+def scheduled_backtest_job():
     print(f'date: {datetime.datetime.now()}, start running job')
     backtest_intraday()
     print(f'date: {datetime.datetime.now()}, finished running job')
 
-scheduler.add_job(scheduled_job, 'cron', day_of_week='sun', hour='10', minute='10', timezone='US/Eastern')
+scheduler.add_job(scheduled_backtest_job, 'cron', day_of_week='sun', hour='10', minute='10', timezone='US/Eastern')
+
+# TODO: there is a calendar api in alpaca that can reveal if there is trading today and when it starts and when it ends...
+# TODO: ...I can maybe use it to define when to run cron job
+
 scheduler.start()
