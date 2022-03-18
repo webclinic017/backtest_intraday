@@ -9,5 +9,7 @@ intraday_backtest_backups/
 full_stocks_csvs_with_features/
 normalized_test_dfs_with_scores/
 normalized_train_dfs_with_scores/
-config/
+config/alpaca/
+config/alpha_vantage/
+config/telegram/
 venv/
