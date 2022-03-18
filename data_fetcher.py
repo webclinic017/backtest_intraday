@@ -12,8 +12,8 @@ import io
 
 from utils import save_create_csv
 
-key_path = '/Users/yochainusan/PycharmProjects/backtest_multi/config/alpha_vantage/key.txt'
-telegram_key_path = '/Users/yochainusan/PycharmProjects/order_notifier/config/telegram/key.txt'
+key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/alpha_vantage/key.txt'
+telegram_key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/telegram/key.txt'
 
 
 def retry_get_request(url):
