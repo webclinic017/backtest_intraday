@@ -7,6 +7,12 @@ import statsmodels.api as sm
 from sklearn.preprocessing import MinMaxScaler
 
 
+columns_to_normalize = ['Volume', '13_ma', '13_ma_slope', '13_ma_volume', 'median_ratio',
+                                'ma_med_34_ratio', 'awesome_osc', 'macd', 'macd_signal',
+                                'distance_from_5_ma', 'adx', '+di', '-di', 'rsi',
+                                'stochastic_d', 'atr_volatility_ma']
+
+
 def get_ATR_column_for_stock(stock_df, period, only_column=True):
     "function to calculate True Range and Average True Range"
     df = stock_df.copy()

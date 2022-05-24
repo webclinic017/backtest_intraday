@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 import math
 import os
 import pandas as pd
@@ -29,20 +31,35 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
+
+from trading_intraday import init_trading
 from utils import is_business_day, is_early_close_business_day
 
-
 print(f'{datetime.datetime.now()} : starting main...')
-
 scheduler = BlockingScheduler()
+ticker_names = ['SPY', 'IWM', 'QQQ', 'XLF', 'XLE', 'XLU', 'XLV', 'XLP']
 
 
 def scheduled_backtest_job():
-    print(f'date: {datetime.datetime.now()}, start running job')
-    backtest_intraday()
-    print(f'date: {datetime.datetime.now()}, finished running job')
+    print(f'date: {datetime.datetime.now()}, start running backtest job')
+    backtest_intraday(ticker_names)
+    print(f'date: {datetime.datetime.now()}, finished running backtest job')
+
+
+def scheduled_trading_job():
+    print(f'date: {datetime.datetime.now()}, start running trading job')
+    init_trading(ticker_names)
+    print(f'date: {datetime.datetime.now()}, finished running trading job')
+
+
+# # TODO: for testing purposes only. delete when ready
+init_trading(ticker_names)
+# TODO: for testing purposes only. delete when ready
+# backtest_intraday(ticker_names)
 
 scheduler.add_job(scheduled_backtest_job, 'cron', day_of_week='sun', hour='10', minute='10', timezone='US/Eastern')
+scheduler.add_job(scheduled_trading_job, 'cron', day_of_week='mon-fri', hour='9', minute='25', timezone='US/Eastern')
+
 
 # TODO: there is a calendar api in alpaca that can reveal if there is trading today and when it starts and when it ends...
 # TODO: ...I can maybe use it to define when to run cron job

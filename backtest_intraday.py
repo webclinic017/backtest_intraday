@@ -15,11 +15,14 @@ from joblib import dump, load
 
 from data_fetcher import get_sp500_list, get_data_dict_for_all_stocks_in_directory, get_data_dict_for_multiple_stocks, \
     get_data_for_stock, get_stock_data_trade_daily_alpha_vantage, get_dfs_for_all_csvs_in_directory
+from stock_utils import get_only_trading_hours_from_df_dict, apply_features_for_stocks, get_indicators_for_df, \
+    get_signals_for_df
 from strategies import calculate_exits_column_by_atr_and_prev_max_min, calculate_returns_for_df_based_on_signals_alone
 from indicators import get_ma_column_for_stock, get_distance_between_columns_for_stock, \
     get_adx_column_for_stock, rsi, stochastic, get_ATR_column_for_stock, get_volatility_from_atr, \
     get_macd_columns_for_stock, normalize_columns, get_beta_column, get_breakout_column_for_stock, \
-    get_touch_and_return_above_column_for_stock, normalize_columns_with_predefined_scaler, slope, simple_slope
+    get_touch_and_return_above_column_for_stock, normalize_columns_with_predefined_scaler, slope, simple_slope, \
+    columns_to_normalize
 from signals import indicators_mid_levels_signal, parabolic_trending_n_periods, cross_20_ma, cross_50_ma, joint_signal, \
     macd_cross_0_signal, macd_signal_cross_signal, joint_macd_signal_cross_signal, joint_macd_cross_0_signal, \
     awesome_oscilator, calculate_correl_score_series_for_df, cumulative_rsi_signal, crossing_mas
@@ -54,68 +57,6 @@ def split_df_to_train_test_sets(df, train_size_weeks, test_size_weeks):
         del dfs[:test_size_weeks]
 
     return resulting_train_dfs, resulting_test_dfs
-
-
-def get_only_trading_hours_from_df_dict(dfs_dict, tickers):
-    for ticker in tickers:
-        start = datetime.time(9, 35)
-        end = datetime.time(16, 5)
-        dfs_dict[ticker]['Date'] = pd.to_datetime(dfs_dict[ticker]['Date'])
-        dfs_dict[ticker] = dfs_dict[ticker][dfs_dict[ticker]['Date'].dt.time.between(start, end)]
-        dfs_dict[ticker] = dfs_dict[ticker].reset_index()
-    return dfs_dict
-
-
-def get_indicators_for_df(df, ticker):
-    print(f'getting indicators for {ticker}')
-    df['5_ma'] = get_ma_column_for_stock(df, 'Close', 5)
-    df['8_ma'] = get_ma_column_for_stock(df, 'Close', 8)
-    df['13_ma'] = get_ma_column_for_stock(df, 'Close', 13)
-    df['5_ma_slope'] = simple_slope(df, '5_ma', 3)
-    df['8_ma_slope'] = simple_slope(df, '8_ma', 3)
-    df['13_ma_slope'] = simple_slope(df, '13_ma', 3)
-    df['5_ma_volume'] = get_ma_column_for_stock(df, 'Volume', 5)
-    df['8_ma_volume'] = get_ma_column_for_stock(df, 'Volume', 8)
-    df['13_ma_volume'] = get_ma_column_for_stock(df, 'Volume', 13)
-    df['5_ma_volume_break'] = get_breakout_column_for_stock(df, 'Volume', '5_ma_volume', '5_ma_volume_break')
-    df['8_ma_volume_break'] = get_breakout_column_for_stock(df, 'Volume', '8_ma_volume', '8_ma_volume_break')
-    df['13_ma_volume_break'] = get_breakout_column_for_stock(df, 'Volume', '13_ma_volume', '13_ma_volume_break')
-    df['5_ma_touch'] = get_touch_and_return_above_column_for_stock(df, 'Close', '5_ma', '5_ma_touch', 4)
-    df['8_ma_touch'] = get_touch_and_return_above_column_for_stock(df, 'Close', '8_ma', '8_ma_touch', 4)
-    df['13_ma_touch'] = get_touch_and_return_above_column_for_stock(df, 'Close', '13_ma', '13_ma_touch', 4)
-    # df['10_beta_SPY'] = get_beta_column(df, stocks_dict['SPY'], 10) # too long to process
-    # df['50_beta_SPY'] = get_beta_column(df, stocks_dict['SPY'], 50) # too long to process
-    # df['10_beta_QQQ'] = get_beta_column(df, stocks_dict['QQQ'], 10)
-    # df['50_beta_QQQ'] = get_beta_column(df, stocks_dict['QQQ'], 50)
-    # df['10_beta_IWM'] = get_beta_column(df, stocks_dict['IWM'], 10)
-    # df['50_beta_IWM'] = get_beta_column(df, stocks_dict['IWM'], 50)
-    df['median'] = (df['High'] + df['Low']) / 2
-    df['ma_med_5'] = get_ma_column_for_stock(df, 'median', 5)
-    df['ma_med_34'] = get_ma_column_for_stock(df, 'median', 34)
-    df['awesome_osc'] = df['ma_med_5'] - df['ma_med_34']
-    df['median_ratio'] = df['median'] / df['Close']
-    df['ma_med_5_ratio'] = df['ma_med_5'] / df['Close']
-    df['ma_med_34_ratio'] = df['ma_med_34'] / df['Close']
-    df['macd'], df['macd_signal'] = get_macd_columns_for_stock(df, 12, 26, 9)
-    df['atr'] = get_ATR_column_for_stock(df, 14)
-    df['distance_from_5_ma'] = get_distance_between_columns_for_stock(df, 'Close', '5_ma')
-    df['adx'], df['+di'], df['-di'] = get_adx_column_for_stock(df, 14)
-    df['adx_ma_med_5_rat'] = df['adx'] * df['ma_med_5_ratio']
-    df['rsi'] = rsi(df, 14)  # changed from 14
-    df['stochastic_k'], df['stochastic_d'] = stochastic(df, 14, 3)
-    df['atr_volatility'], df['atr_volatility_ma'] = get_volatility_from_atr(df, 14)
-    return df
-
-
-def get_signals_for_df(df, ticker):
-    print(f'getting signals for {ticker}')
-    df['signal_type'] = None
-    df['signal_direction'] = None
-    # signal_type and signal_direction columns are the columns that determine the actual orders!
-    # TODO: depending on the type of signal I want, toggle comments
-    # df = awesome_oscilator(df, 'signal_direction', 'signal_type')
-    df = crossing_mas(df, 'signal_direction', 'signal_type')
-    return df
 
 
 def calculate_returns_for_df(df, n_prev_periods_check, ticker_name):
@@ -345,15 +286,6 @@ def read_splitted_stocks_dfs():
     return splitted_stocks_dict
 
 
-def apply_features_for_stocks(all_stocks_dict, tickers):
-    for ticker in tickers:
-        print(f'applying features for full stock {ticker}')
-        all_stocks_dict[ticker] = get_indicators_for_df(all_stocks_dict[ticker], ticker)
-        all_stocks_dict[ticker] = get_signals_for_df(all_stocks_dict[ticker], ticker)
-        save_create_csv('full_stocks_csvs_with_features', f'{ticker}',  all_stocks_dict[ticker])
-    return all_stocks_dict
-
-
 def transformation_sin_cos(column):
   max_value = column.max()
   sin_values = [math.sin((2 * math.pi * x) / max_value) for x in list(column)]
@@ -445,20 +377,20 @@ def select_best_actions_using_machine_learning(train_dfs, test_dfs, feature_col_
 
 
 
-def backtest_intraday():
+def backtest_intraday(adjusted_tickers):
     # tickers = get_sp500_list()
     # adjusted_tickers = [elem for elem in tickers if elem != 'GOOG' and elem != 'DUK' and elem != 'HLT' and elem != 'DD' and elem != 'CMCSA' and elem != 'COG' and elem != 'WBA' and elem != 'KMX' and elem != 'ADP' and elem != 'STZ' and elem != 'IQV' and elem != 'BBWI' and elem != 'CTRA'] # there were stock splits
     # adjusted_tickers = [elem for elem in adjusted_tickers if '.' not in elem]
 
     # adjusted_tickers = ['FB', 'AAPL', 'SPY', 'IWM', 'QQQ', 'AMZN', 'TSLA', 'GOOGL', 'AAL', 'WYNN', 'MMM', 'DIS', 'NFLX', 'AMD', 'INTL', 'MS', 'IVZ', 'AZO', 'IT', 'T', 'VZ', 'QCOM', 'MGM', 'BLK', 'NVDA', 'PYPL', 'MRNA', 'TEVA', 'XLF', 'XLE', 'XLU', 'JPM', 'V', 'BAC', 'TSM', 'JNJ', 'WMT']
-    adjusted_tickers = ['SPY', 'IWM', 'QQQ', 'XLF', 'XLE', 'XLU', 'XLV', 'XLI', 'XLP']
+    # adjusted_tickers = ['SPY', 'IWM', 'QQQ', 'XLF', 'XLE', 'XLU', 'XLV', 'XLI', 'XLP']
     # adjusted_tickers = ['SPY']
 
     # adjusted_tickers = adjusted_tickers + ['SPY', 'QQQ', 'IWM']
 
-    # stocks_dict = get_data_dict_for_multiple_stocks(adjusted_tickers, time)
+    stocks_dict = get_data_dict_for_multiple_stocks(adjusted_tickers, time)
 
-    stocks_dict, adjusted_tickers = get_data_dict_for_all_stocks_in_directory('stocks_csvs_raw')
+    # stocks_dict, adjusted_tickers = get_data_dict_for_all_stocks_in_directory('stocks_csvs_raw')
 
     # stocks_dict = { tick: stocks_dict[tick].iloc[-(252*4):].reset_index(drop=True) for tick in adjusted_tickers }
 
@@ -474,19 +406,15 @@ def backtest_intraday():
 
     combined_train_dfs_for_all_stocks_by_index = combine_dfs_for_all_stocks_by_index(all_splitted_stocks_dict, 'train_dfs', adjusted_tickers)
     combined_test_dfs_for_all_stocks_by_index = combine_dfs_for_all_stocks_by_index(all_splitted_stocks_dict, 'test_dfs', adjusted_tickers)
-    # columns_to_normalize = ['Volume', '5_ma', '8_ma', '13_ma', '5_ma_slope', '13_ma_slope', '5_ma_volume', '8_ma_volume', '13_ma_volume', 'median_ratio', 'ma_med_5_ratio',
-    #                             'ma_med_34_ratio', 'awesome_osc', 'macd', 'macd_signal',
-    #                             'distance_from_5_ma', 'adx', '+di', '-di', 'rsi', 'stochastic_k',
-    #                             'stochastic_d', 'atr_volatility', 'atr_volatility_ma']
-    columns_to_normalize = ['Volume', '13_ma', '13_ma_slope', '13_ma_volume', 'median_ratio',
-                                'ma_med_34_ratio', 'awesome_osc', 'macd', 'macd_signal',
-                                'distance_from_5_ma', 'adx', '+di', '-di', 'rsi',
-                                'stochastic_d', 'atr_volatility_ma']
+
     # TODO: normalization should be per stock per df index
     # TODO: scoring should be per stock per df index
     # TODO: when I see in test (and train) a row from 'QQQ' index 77, I'll get the correlations of QQQ index 77 for that row.
     # TODO: scoring will not be holistic for all stocks, but per stock.
     normalized_train_dfs, train_scalers = normalize_dfs(combined_train_dfs_for_all_stocks_by_index, columns_to_normalize)
+    # TODO: Save the last scaler for later use. Done
+    dump(train_scalers[-1], 'last_train_scaler.gz')
+
     all_actions_train_dfs = get_all_actions_dfs_list(normalized_train_dfs)
     only_entrances_train_dfs = get_only_entrances_dfs_list(all_actions_train_dfs)
     correls_dicts_for_train_dfs = get_correls_dicts_for_train_dfs(only_entrances_train_dfs, columns_to_normalize)

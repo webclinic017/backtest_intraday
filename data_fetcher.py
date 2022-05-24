@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import math
 import asyncio
+from alpaca_trade_api.rest import REST, TimeFrame, TimeFrameUnit
+from alpaca_trade_api.stream import Stream
 from alpha_vantage.async_support.timeseries import TimeSeries
 import os
 import numpy as np
@@ -11,9 +13,51 @@ import time
 import io
 
 from utils import save_create_csv
+from utils import get_todays_start_of_trade_str, read_stock_from_file, save_create_csv
 
-key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/alpha_vantage/key.txt'
-telegram_key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/telegram/key.txt'
+key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/alpha_vantage/key.txt' # TODO: delete once I implemented dotenv
+telegram_key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/telegram/key.txt' # TODO: delete once I implemented dotenv
+
+api = REST(api_version='v2')
+stream = Stream(data_feed='sip', raw_data=True)
+# stream = Stream(data_feed='sip', raw_data=True)
+
+
+def get_existing_position_in_ticker(ticker):
+    return api.get_position(ticker)
+
+
+def get_existing_positions():
+    # returns an empty array [] if no positions exist
+    return api.list_positions()
+
+
+def submit_limit_order(ticker, price, action):
+    api.submit_order(
+        symbol=ticker,
+        side='buy',
+        type='market',
+        qty='100',
+        time_in_force='day',
+        order_class='bracket',
+        take_profit=dict(
+            limit_price='305.0',
+        ),
+        stop_loss=dict(
+            stop_price='295.5',
+            limit_price='295.5',
+        )
+    )
+
+
+
+def subscribe_to_stream(tickers, on_new_data_callback):
+    print('--- subscribing to stream ---')
+    for ticker in tickers:
+        stream.subscribe_bars(on_new_data_callback, ticker)
+        # stream.subscribe_updated_bars(on_new_data_callback, ticker)
+        # stream.subscribe_news(on_new_data_callback, ticker)
+    stream.run()
 
 
 def retry_get_request(url):
@@ -39,6 +83,35 @@ def get_sp500_list():
     df.to_csv('S&P500-Info.csv')
     df.to_csv("S&P500-Symbols.csv", columns=['Symbol'])
     return df['Symbol']
+
+
+def get_alpaca_account_data():
+    print('--- getting alpaca account data ---')
+    account = api.get_account()
+    return account
+
+
+def get_market_clock():
+    print('--- getting market clock ---')
+    market_times = api.get_clock()
+    return market_times
+
+
+def get_alpaca_stocks_and_save(tickers):
+    print('--- getting alpaca stocks ---')
+    frame = TimeFrame(5, TimeFrameUnit.Minute)
+    today_trade_start = get_todays_start_of_trade_str()
+    data_rows_num = 78 * 2 * len(tickers) # 2 days of data per ticker
+    all_tickers_df = api.get_bars(tickers, frame, start=today_trade_start,
+                                  limit=data_rows_num).df
+    all_tickers_df = all_tickers_df.tz_convert('US/Eastern')
+    all_tickers_df = all_tickers_df.reset_index().rename(columns={'timestamp': 'Date', 'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
+    recent_stocks_dict = {}
+    for ticker_name, stock_df in all_tickers_df.groupby('symbol'):
+        print(stock_df)
+        recent_stocks_dict[ticker_name] = stock_df
+        save_create_csv('recent_stocks_raw_data', ticker_name, stock_df)
+    return recent_stocks_dict
 
 
 def get_stock_earnings_data(ticker, start_time, time):
