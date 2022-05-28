@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import pandas_market_calendars as mcal
 
@@ -26,8 +26,10 @@ def get_todays_start_of_trade_str():
     # 2022-03-25T09:30:00Z
     # hour_str = 'T9:30:00Z' # for some reason the input time is in Grinich timezone. need to add 4 hours to this hour for now
     # TODO: because of Krakow - removing one hour: 13:30 => 12:30 - this has to be dynamic by timezone!!!
-    hour_str = 'T12:30:00Z'
+    hour_str = 'T13:30:00Z'
     today_date_str = datetime.today().strftime('%Y-%m-%d')
+    # TODO: because of Saturday - subtracting one day. has to be dynamic
+    # today_date_str = (datetime.today() - timedelta(1)).strftime('%Y-%m-%d')
     return today_date_str + hour_str
 
 
@@ -42,28 +44,28 @@ def get_leveraged_etfs():
     leveraged_tickers = [{
         '1x': 'SPY',
         '2x': 'SSO',
-        '3X': 'SPXL'
+        '3x': 'SPXL'
     }, {
         '1x': 'QQQ',
         '2x': 'QLD',
-        '3X': 'TQQQ'
+        '3x': 'TQQQ'
     }, {
         '1x': 'IWM',
         '2x': 'UWM',
-        '3X': 'URTY'
+        '3x': 'URTY'
     }, {
         '1x': 'XLF',
-        '3X': 'FAS'
+        '3x': 'FAS'
     }, {
         '1x': 'XLE',
         '2x': 'ERX',
-        '3X': 'OILU'
+        '3x': 'OILU'
     }, {
         '1x': 'XLU',
-        '3X': 'UTSL'
+        '3x': 'UTSL'
     }, {
         '1x': 'XLV',
-        '3X': 'CURE'
+        '3x': 'CURE'
     }, {
         '1x': 'XLI',
         '3x': 'DUSL'
@@ -71,6 +73,14 @@ def get_leveraged_etfs():
         '1x': 'XLP'
     }]
     return leveraged_tickers
+
+
+def get_feature_col_names():
+    return ['Volume_norm', '13_ma_norm', '13_ma_slope_norm', '13_ma_volume_norm', 'median_ratio_norm',
+                                'ma_med_34_ratio_norm', 'awesome_osc_norm', 'macd_norm', 'macd_signal_norm',
+                                'distance_from_5_ma_norm', 'adx_norm', '+di_norm', '-di_norm', 'rsi_norm',
+                                'stochastic_d_norm', 'atr_volatility_ma_norm', 'binary_signal', 'binary_5_ma_vol_break',
+                                'binary_5_ma_touch', 'day_of_week_sin', 'day_of_week_cos', 'ticker_sin', 'ticker_cos', 'time_of_day']
 
 
 def read_stock_from_file(ticker_name, dir_name):

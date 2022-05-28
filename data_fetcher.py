@@ -12,6 +12,7 @@ import requests
 import time
 import io
 
+from stock_utils import convert_action_to_api_action
 from utils import save_create_csv
 from utils import get_todays_start_of_trade_str, read_stock_from_file, save_create_csv
 
@@ -32,21 +33,25 @@ def get_existing_positions():
     return api.list_positions()
 
 
-def submit_limit_order(ticker, price, action):
-    api.submit_order(
+def submit_limit_order(ticker, price, action, stock_quantity):
+    api_action = convert_action_to_api_action(action)
+    return api.submit_order(
         symbol=ticker,
-        side='buy',
-        type='market',
-        qty='100',
+        side=api_action,
+        type='limit',
+        qty=stock_quantity,
         time_in_force='day',
-        order_class='bracket',
-        take_profit=dict(
-            limit_price='305.0',
-        ),
-        stop_loss=dict(
-            stop_price='295.5',
-            limit_price='295.5',
-        )
+        order_class='simple',
+        limit_price=price,
+        # TODO: order_class='bracket' is used for setting up stop loss &/or take profit orders
+        # order_class='bracket',
+        # take_profit=dict(
+        #     limit_price='305.0',
+        # ),
+        # stop_loss=dict(
+        #     stop_price='295.5',
+        #     limit_price='295.5',
+        # )
     )
 
 
@@ -97,13 +102,18 @@ def get_market_clock():
     return market_times
 
 
+def get_alpaca_stock_latest_bar(ticker):
+    frame = TimeFrame(1, TimeFrameUnit.Minute)
+    bars = api.get_bars(ticker, frame)
+    return bars[-1]
+
+
 def get_alpaca_stocks_and_save(tickers):
     print('--- getting alpaca stocks ---')
     frame = TimeFrame(5, TimeFrameUnit.Minute)
     today_trade_start = get_todays_start_of_trade_str()
     data_rows_num = 78 * 2 * len(tickers) # 2 days of data per ticker
-    all_tickers_df = api.get_bars(tickers, frame, start=today_trade_start,
-                                  limit=data_rows_num).df
+    all_tickers_df = api.get_bars(tickers, frame, start=today_trade_start, limit=data_rows_num).df
     all_tickers_df = all_tickers_df.tz_convert('US/Eastern')
     all_tickers_df = all_tickers_df.reset_index().rename(columns={'timestamp': 'Date', 'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
     recent_stocks_dict = {}

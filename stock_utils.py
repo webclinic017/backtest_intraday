@@ -3,11 +3,12 @@ import datetime
 import numpy as np
 import pandas as pd
 
+from data_fetcher import submit_limit_order, get_alpaca_stock_latest_bar
 from indicators import get_ma_column_for_stock, simple_slope, get_breakout_column_for_stock, \
     get_touch_and_return_above_column_for_stock, get_macd_columns_for_stock, get_ATR_column_for_stock, \
     get_distance_between_columns_for_stock, get_adx_column_for_stock, rsi, stochastic, get_volatility_from_atr
 from signals import crossing_mas
-from utils import save_create_csv
+from utils import save_create_csv, get_leveraged_etfs, get_feature_col_names
 
 
 def get_only_trading_hours_from_df_dict(dfs_dict, tickers):
@@ -20,10 +21,47 @@ def get_only_trading_hours_from_df_dict(dfs_dict, tickers):
     return dfs_dict
 
 
-def convert_order_to_api_order(order):
-    if order == 'Buy':
+def get_live_positions_value(positions):
+    positions_value = 0
+    for position in positions:
+        positions_value += abs(float(position.market_value))
+    return positions_value
+
+
+def get_stock_quantity_to_trade(live_positions_value, price, current_cash, pct_of_total_equity):
+    total_equity = current_cash + live_positions_value
+    ideal_cash_to_trade = total_equity * pct_of_total_equity
+    actual_cash_to_trade = min(ideal_cash_to_trade, current_cash)
+    if actual_cash_to_trade < ideal_cash_to_trade:
+        print("Actual cash to trade is less than ideal cash to trade. Ideal cash to trade: {}, actual cash to trade: {}".format(ideal_cash_to_trade, actual_cash_to_trade))
+    quantity_to_trade = int(actual_cash_to_trade / price)
+    if quantity_to_trade < 1:
+        print("Quantity to trade is less than 1")
+    return quantity_to_trade
+
+
+def close_position(position_data, limit_price):
+    if position_data.side == 'long':
+        # sell the stock
+        return submit_limit_order(position_data.symbol, 'Exit Buy', limit_price, position_data.qty)
+    elif position_data.side == 'short':
+        # buy the stock
+        return submit_limit_order(position_data.symbol, 'Exit Sell', limit_price, position_data.qty)
+
+
+def get_live_positions_ticker_names(positions):
+    ticker_names = []
+    leveraged_etfs = get_leveraged_etfs()
+    for position in positions:
+        leveraged_etfs_dict = next(item for item in leveraged_etfs if item["1x"] == position.symbol or item["2x"] == position.symbol or item["3x"] == position.symbol)
+        ticker_names += leveraged_etfs_dict.values()
+    return ticker_names
+
+
+def convert_action_to_api_action(order):
+    if order == 'Bullish' or order == 'Exit Sell':
         return 'buy'
-    elif order == 'Sell':
+    elif order == 'Bearish' or order == 'Exit Buy':
         return 'sell'
 
 
@@ -98,10 +136,25 @@ def apply_features_for_stocks(all_stocks_dict, tickers):
     return all_stocks_dict
 
 
-def get_last_row_action_from_stock(last_row, ticker):
+def get_leveraged_etf_price(ticker):
+    leveraged_etfs = get_leveraged_etfs()
+    corresponding_leveraged_etf = None
+    for etf in leveraged_etfs:
+        if etf['1x'] == ticker:
+            corresponding_leveraged_etf = etf.values()[-1]
+            break
+    corresponding_leveraged_etf_price = get_alpaca_stock_latest_bar(corresponding_leveraged_etf).c
+    return corresponding_leveraged_etf, corresponding_leveraged_etf_price
+
+
+def get_last_row_action_from_stock(last_row, ticker, model):
     print(f'getting last row action for {ticker}')
+
     if last_row['signal'] == 'Bullish' or last_row['signal'] == 'Bearish':
-        return last_row['signal'], last_row['entry_price']
+        feature_col_names = get_feature_col_names()
+        last_row_as_array = last_row[feature_col_names].values
+        prediction = model.predict(last_row_as_array)[0]
+        return last_row['signal'], last_row['entry_price'], prediction
     if last_row['exits'] == 'Exit Buy' or last_row['exits'] == 'Exit Sell':
-        return last_row['exits'], last_row['Close']
-    return None, None
+        return last_row['exits'], last_row['Close'], 0
+    return None, None, 0

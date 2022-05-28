@@ -6,10 +6,11 @@ import logging
 from joblib import load
 
 from data_fetcher import get_alpaca_stocks_and_save, get_alpaca_account_data, get_market_clock, subscribe_to_stream, \
-    get_existing_position_in_ticker, get_existing_positions
+    get_existing_position_in_ticker, get_existing_positions, submit_limit_order
 from indicators import normalize_columns_with_predefined_scaler, columns_to_normalize
 from stock_utils import get_only_trading_hours_from_df_dict, apply_features_for_stocks, get_indicators_for_df, \
-    get_signals_for_df, update_n_minute_bar, get_last_row_action_from_stock
+    get_signals_for_df, update_n_minute_bar, get_last_row_action_from_stock, get_live_positions_value, \
+    get_live_positions_ticker_names, close_position, get_stock_quantity_to_trade, get_leveraged_etf_price
 from strategies import calculate_returns_for_df_based_on_signals_alone
 from utils import get_next_period_minute_window_date
 
@@ -52,24 +53,44 @@ def trade_row(row_data, ticker):
     return None
 
 
-def handle_last_row_action(action, price, ticker, current_positions):
+def handle_last_row_action(action, price, ticker, current_positions, account_data, prediction):
+    live_positions_value = get_live_positions_value(current_positions)
+    live_positions_ticker_names = get_live_positions_ticker_names(current_positions)
+    current_cash = account_data.cash
     if 'Exit' in action:
-        if ticker not in current_positions:
+        if ticker not in live_positions_ticker_names:
             print(f'Warning: Found exit alert but not a live position in {ticker}')
+            return None
         else:
-            # TODO: waiting to see how a position looks like
-    elif 'Buy' in action:
-        if ticker in current_positions:
-            print(f'Found buy alert while I already have a live position in {ticker}')
-            # TODO: Figure out if I should do nothing or buy more
+            return close_position(ticker, price)
+    elif 'Bullish' in action or 'Bearish' in action:
+        if ticker in live_positions_ticker_names:
+            print(f'Warning: Found trade alert while I already have a live position in {ticker}, action: {action}, positions: {current_positions}')
+            return None
         else:
-            submit_limit_order(ticker, price, action)
-
-
+            # TODO: for now, predict last row and pront prediction - but later, we should use the prediction to determine if we should enter trade or not.
+            # TODO: for now, lets try to maintain a 20% equity per position
+            current_leveraged_etf_name, current_leveraged_etf_price = get_leveraged_etf_price(ticker)
+            print(f'Trade alert, ticker: {ticker}, action: {action}, prediction: {prediction}')
+            stock_quantity = get_stock_quantity_to_trade(live_positions_value, current_leveraged_etf_price, current_cash, 0.2)
+            return submit_limit_order(current_leveraged_etf_name, current_leveraged_etf_price, action, stock_quantity)
     return None
 
 
+def create_mock_bar():
+    return {
+        't': '2022-05-28T04:18:29.933217006-04:00',
+        'o': 140,
+        'h': 150,
+        'l': 138,
+        'c': 143,
+        'v': 10000,
+        'S': 'symbol'
+    }
+
+
 async def on_new_stock_data(bar):
+    current_account_data = get_alpaca_account_data()
     # Not sure if bar is a dict or a dataframe or a series.
     print(f'Received new stock data {bar["S"]}')
     # TODO: 1. save as last row on all_stocks_dict_with_features with new_column "Real_Date" and save 5 minute after last row on "Date"
@@ -89,6 +110,7 @@ async def on_new_stock_data(bar):
 
     global all_stocks_dict_with_features
     global last_train_scaler
+    global model
 
     bar = update_n_minute_bar(all_stocks_dict_with_features[ticker_name].iloc[-1], bar, 5)
 
@@ -114,15 +136,11 @@ async def on_new_stock_data(bar):
     #  6. if I do not have enough cash, check if this position is better than other positions I currently have (don't develop yet - this is a complex feature that takes in consideration scoring (which I dont have), am I profitable in the position im currently checking?, am i about to be profitable in the position im currently checking?, etc).
     #  7. if the position is not better than other positions I currently have, log info and do nothing.
     #  8. if the position is better than other positions I currently have, exit the worst position (don't develop yet) and enter to this position.
-    #  9. missing a case of buy that turns into sell and vice versa.
-    last_row_action, last_row_price = get_last_row_action_from_stock(all_stocks_dict_with_features[ticker_name].iloc[-1], ticker_name)
+    #  9. missing a case of buy that turns into sell and vice versa. Don't think I have implemented such a case in the first place.
+    last_row_action, last_row_price, last_row_prediction = get_last_row_action_from_stock(all_stocks_dict_with_features[ticker_name].iloc[-1], ticker_name, model)
     all_positions = get_existing_positions()
-    result = handle_last_row_action(last_row_action, last_row_price, ticker_name, all_positions)
-
-    # current_position_in_the_stock = get_existing_position_in_ticker(ticker_name)
-    # predict last row
-    # if predict ok, trade on last row.
-
+    result = handle_last_row_action(last_row_action, last_row_price, ticker_name, all_positions, current_account_data, last_row_prediction)
+    return result
 
 
 # async def subscribe_wrapper(stocks_dict, scaler, callback):

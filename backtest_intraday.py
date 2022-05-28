@@ -32,7 +32,7 @@ import seaborn as sns
 import datetime
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
-from utils import save_create_csv
+from utils import save_create_csv, get_feature_col_names
 
 
 def split_df_to_train_test_sets(df, train_size_weeks, test_size_weeks):
@@ -443,11 +443,7 @@ def backtest_intraday(adjusted_tickers):
     normalized_test_dfs_with_scores = construct_categorical_cols_for_dfs(normalized_test_dfs_with_scores, adjusted_tickers)
 
 
-    feature_col_names = ['Volume_norm', '13_ma_norm', '13_ma_slope_norm', '13_ma_volume_norm', 'median_ratio_norm',
-                                'ma_med_34_ratio_norm', 'awesome_osc_norm', 'macd_norm', 'macd_signal_norm',
-                                'distance_from_5_ma_norm', 'adx_norm', '+di_norm', '-di_norm', 'rsi_norm',
-                                'stochastic_d_norm', 'atr_volatility_ma_norm', 'binary_signal', 'binary_5_ma_vol_break',
-                                'binary_5_ma_touch', 'day_of_week_sin', 'day_of_week_cos', 'ticker_sin', 'ticker_cos', 'time_of_day']
+    feature_col_names = get_feature_col_names()
     label_col_name = 'action_return_on_signal_index_categorical'
     all_cols = feature_col_names + [label_col_name]
 
