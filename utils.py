@@ -75,6 +75,13 @@ def get_leveraged_etfs():
     return leveraged_tickers
 
 
+def convert_action_to_api_action(order):
+    if order == 'Bullish' or order == 'Exit Sell':
+        return 'buy'
+    elif order == 'Bearish' or order == 'Exit Buy':
+        return 'sell'
+
+
 def get_feature_col_names():
     return ['Volume_norm', '13_ma_norm', '13_ma_slope_norm', '13_ma_volume_norm', 'median_ratio_norm',
                                 'ma_med_34_ratio_norm', 'awesome_osc_norm', 'macd_norm', 'macd_signal_norm',

@@ -58,13 +58,6 @@ def get_live_positions_ticker_names(positions):
     return ticker_names
 
 
-def convert_action_to_api_action(order):
-    if order == 'Bullish' or order == 'Exit Sell':
-        return 'buy'
-    elif order == 'Bearish' or order == 'Exit Buy':
-        return 'sell'
-
-
 def update_n_minute_bar(stock_df_last_row, current_bar, minute_period):
     if 'Real_Date' not in stock_df_last_row or stock_df_last_row['Real_Date'].minute % minute_period == 0:
         return current_bar

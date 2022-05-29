@@ -12,9 +12,8 @@ import requests
 import time
 import io
 
-from stock_utils import convert_action_to_api_action
 from utils import save_create_csv
-from utils import get_todays_start_of_trade_str, read_stock_from_file, save_create_csv
+from utils import get_todays_start_of_trade_str, read_stock_from_file, save_create_csv, convert_action_to_api_action
 
 key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/alpha_vantage/key.txt' # TODO: delete once I implemented dotenv
 telegram_key_path = '/Users/yochainusan/Desktop/backtest_intraday/config/telegram/key.txt' # TODO: delete once I implemented dotenv

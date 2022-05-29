@@ -9,6 +9,11 @@ from imblearn.under_sampling import RandomUnderSampler
 from imblearn.pipeline import Pipeline
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.gaussian_process.kernels import RBF
+from sklearn.gaussian_process.kernels import DotProduct
+from sklearn.gaussian_process.kernels import Matern
+from sklearn.gaussian_process.kernels import RationalQuadratic
+from sklearn.gaussian_process.kernels import WhiteKernel
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from joblib import dump, load
@@ -343,7 +348,7 @@ def drop_rows_with_na_values_from_dfs(df_list, cols_to_consider):
 def select_best_actions_using_machine_learning(train_dfs, test_dfs, feature_col_names, label_col_name):
     # the model will train on each train set and will predict on a corresponding test set.
     # we will predict future values according to the model resulted from all train sets.
-    gpc = GaussianProcessClassifier(random_state=0)
+    gpc = GaussianProcessClassifier(1*RBF(), random_state=0)
     # gbc = GradientBoostingClassifier(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0)
     over = SMOTE(sampling_strategy=0.3)
     # under = RandomUnderSampler(sampling_strategy=0.9)
