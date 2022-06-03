@@ -10,9 +10,10 @@ from data_fetcher import get_alpaca_stocks_and_save, get_alpaca_account_data, ge
 from indicators import normalize_columns_with_predefined_scaler, columns_to_normalize
 from stock_utils import get_only_trading_hours_from_df_dict, apply_features_for_stocks, get_indicators_for_df, \
     get_signals_for_df, update_n_minute_bar, get_last_row_action_from_stock, get_live_positions_value, \
-    get_live_positions_ticker_names, close_position, get_stock_quantity_to_trade, get_leveraged_etf_price
+    get_live_positions_ticker_names, close_position, get_stock_quantity_to_trade, get_leveraged_etf_price, \
+    get_tickers_map, construct_categorical_cols_for_df
 from strategies import calculate_returns_for_df_based_on_signals_alone
-from utils import get_next_period_minute_window_date
+from utils import get_next_period_minute_window_date, get_leveraged_etfs
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
@@ -43,6 +44,7 @@ What will be saved:
 all_stocks_dict_with_features = {}
 model = None
 last_train_scaler = None
+tickers = []
 
 
 def check_exit_position(position_data):
@@ -56,24 +58,32 @@ def trade_row(row_data, ticker):
 def handle_last_row_action(action, price, ticker, current_positions, account_data, prediction):
     live_positions_value = get_live_positions_value(current_positions)
     live_positions_ticker_names = get_live_positions_ticker_names(current_positions)
-    current_cash = account_data.cash
+    current_cash = float(account_data.cash)
     if 'Exit' in action:
         if ticker not in live_positions_ticker_names:
             print(f'Warning: Found exit alert but not a live position in {ticker}')
             return None
         else:
-            return close_position(ticker, price)
+            leveraged_etfs = get_leveraged_etfs()
+            position_etf_dict = {}
+            for etf_dict in leveraged_etfs:
+                if (etf_dict['1x'] == ticker) or (etf_dict['leveraged'] == ticker) or (etf_dict["inverse_leveraged"] == ticker):
+                    position_etf_dict = etf_dict
+            position_to_close = next((pos for pos in current_positions if (pos.symbol == position_etf_dict['1x']) or (pos.symbol == position_etf_dict['leveraged']) or (pos.symbol == position_etf_dict['inverse_leveraged'])), None)
+            print(f'Close alert, ticker: {ticker}, action: {action}')
+            return close_position(position_to_close, price)
     elif 'Bullish' in action or 'Bearish' in action:
         if ticker in live_positions_ticker_names:
             print(f'Warning: Found trade alert while I already have a live position in {ticker}, action: {action}, positions: {current_positions}')
             return None
         else:
-            # TODO: for now, predict last row and pront prediction - but later, we should use the prediction to determine if we should enter trade or not.
+            # TODO: for now, predict last row and print prediction - but later, we should use the prediction to determine if we should enter trade or not.
             # TODO: for now, lets try to maintain a 20% equity per position
-            current_leveraged_etf_name, current_leveraged_etf_price = get_leveraged_etf_price(ticker)
+            current_leveraged_etf_name, current_leveraged_etf_price = get_leveraged_etf_price(ticker, action)
             print(f'Trade alert, ticker: {ticker}, action: {action}, prediction: {prediction}')
             stock_quantity = get_stock_quantity_to_trade(live_positions_value, current_leveraged_etf_price, current_cash, 0.2)
-            return submit_limit_order(current_leveraged_etf_name, current_leveraged_etf_price, action, stock_quantity)
+            # always buying long (on bearish - buying long inverse)
+            return submit_limit_order(current_leveraged_etf_name, current_leveraged_etf_price, 'Bullish', stock_quantity)
     return None
 
 
@@ -111,10 +121,12 @@ async def on_new_stock_data(bar):
     global all_stocks_dict_with_features
     global last_train_scaler
     global model
+    global tickers
 
     bar = update_n_minute_bar(all_stocks_dict_with_features[ticker_name].iloc[-1], bar, 5)
 
     if bar.at[0, 'Real_Date'] != bar.at[0, 'Date'] and 'Real_Date' in all_stocks_dict_with_features[ticker_name].columns:
+        # TODO: check if the following line copies flags as well (then i'll have duplicate flags which would produce many false alerts and warning logs)
         all_stocks_dict_with_features[ticker_name] = all_stocks_dict_with_features[ticker_name].iloc[:-1]
     all_stocks_dict_with_features[ticker_name] = pd.concat([all_stocks_dict_with_features[ticker_name], bar])
     all_stocks_dict_with_features[ticker_name] = all_stocks_dict_with_features[ticker_name].reset_index(drop=True)
@@ -124,6 +136,7 @@ async def on_new_stock_data(bar):
             all_stocks_dict_with_features[ticker_name], ticker_name)
     all_stocks_dict_with_features[ticker_name] = normalize_columns_with_predefined_scaler(
         all_stocks_dict_with_features[ticker_name], columns_to_normalize, last_train_scaler)
+    all_stocks_dict_with_features[ticker_name] = construct_categorical_cols_for_df(all_stocks_dict_with_features[ticker_name], get_tickers_map(tickers))
     # TODO: 1. check for exit flag in stock
     #  2. if exit flag, check if we are currently in a position for this stock (or leveraged stock).
     #  3. if we are in a position, exit the position.
@@ -180,11 +193,14 @@ def on_market_close():
     return None
 
 
-def init_trading(tickers):
+def init_trading(ticker_names):
     account = get_alpaca_account_data()
     print(account)
     market_times = get_market_clock()
     print(f'today\'s market times: {market_times}')
+
+    global tickers
+    tickers = ticker_names
 
     if not market_times.is_open:
         if market_times.next_open.date() != datetime.today().date():

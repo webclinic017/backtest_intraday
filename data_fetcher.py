@@ -41,7 +41,7 @@ def submit_limit_order(ticker, price, action, stock_quantity):
         qty=stock_quantity,
         time_in_force='day',
         order_class='simple',
-        limit_price=price,
+        limit_price=round(price, 2),
         # TODO: order_class='bracket' is used for setting up stop loss &/or take profit orders
         # order_class='bracket',
         # take_profit=dict(

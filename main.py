@@ -53,9 +53,9 @@ def scheduled_trading_job():
 
 
 # # TODO: for testing purposes only. delete when ready
-# init_trading(ticker_names)
+init_trading(ticker_names)
 # TODO: for testing purposes only. delete when ready
-backtest_intraday(ticker_names)
+# backtest_intraday(ticker_names)
 
 scheduler.add_job(scheduled_backtest_job, 'cron', day_of_week='sun', hour='10', minute='10', timezone='US/Eastern')
 scheduler.add_job(scheduled_trading_job, 'cron', day_of_week='mon-fri', hour='9', minute='25', timezone='US/Eastern')

@@ -10,10 +10,13 @@ from imblearn.pipeline import Pipeline
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF
-from sklearn.gaussian_process.kernels import DotProduct
-from sklearn.gaussian_process.kernels import Matern
-from sklearn.gaussian_process.kernels import RationalQuadratic
-from sklearn.gaussian_process.kernels import WhiteKernel
+from sklearn.gaussian_process import kernels
+# from sklearn.gaussian_process.kernels import RBF
+# from sklearn.gaussian_process.kernels import ExpSineSquared
+# from sklearn.gaussian_process.kernels import DotProduct
+# from sklearn.gaussian_process.kernels import Matern
+# from sklearn.gaussian_process.kernels import RationalQuadratic
+# from sklearn.gaussian_process.kernels import WhiteKernel
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from joblib import dump, load
@@ -21,7 +24,7 @@ from joblib import dump, load
 from data_fetcher import get_sp500_list, get_data_dict_for_all_stocks_in_directory, get_data_dict_for_multiple_stocks, \
     get_data_for_stock, get_stock_data_trade_daily_alpha_vantage, get_dfs_for_all_csvs_in_directory
 from stock_utils import get_only_trading_hours_from_df_dict, apply_features_for_stocks, get_indicators_for_df, \
-    get_signals_for_df
+    get_signals_for_df, get_tickers_map, construct_categorical_cols_for_df
 from strategies import calculate_exits_column_by_atr_and_prev_max_min, calculate_returns_for_df_based_on_signals_alone
 from indicators import get_ma_column_for_stock, get_distance_between_columns_for_stock, \
     get_adx_column_for_stock, rsi, stochastic, get_ATR_column_for_stock, get_volatility_from_atr, \
@@ -37,7 +40,7 @@ import seaborn as sns
 import datetime
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
-from utils import save_create_csv, get_feature_col_names
+from utils import save_create_csv, get_feature_col_names, transformation_sin_cos
 
 
 def split_df_to_train_test_sets(df, train_size_weeks, test_size_weeks):
@@ -291,26 +294,10 @@ def read_splitted_stocks_dfs():
     return splitted_stocks_dict
 
 
-def transformation_sin_cos(column):
-  max_value = column.max()
-  sin_values = [math.sin((2 * math.pi * x) / max_value) for x in list(column)]
-  cos_values = [math.cos((2 * math.pi * x) / max_value) for x in list(column)]
-  return sin_values, cos_values
-
-
 def construct_categorical_cols_for_dfs(df_list, all_tickers):
-    ticker_map = { index: ticker_name for ticker_name, index in enumerate(all_tickers) }
+    ticker_map = get_tickers_map(all_tickers)
     for i in range(len(df_list)):
-        df_list[i]['ticker'] = df_list[i]['ticker'].map(ticker_map)
-        df_list[i]['ticker_sin'], df_list[i]['ticker_cos'] = transformation_sin_cos(df_list[i]['ticker'])
-        df_list[i]['day_of_week'] = pd.to_datetime(df_list[i]['Date'], format ='%Y-%m-%d %H:%M:%S').dt.dayofweek
-        df_list[i]['day_of_week_sin'], df_list[i]['day_of_week_cos'] = transformation_sin_cos(df_list[i]['day_of_week'])
-        df_list[i]['time_of_day'] = pd.to_datetime(df_list[i]['Date'], format ='%Y-%m-%d %H:%M:%S').dt.hour.apply(lambda x: 1 if x >= 13 else 0)
-        df_list[i]['binary_signal'] = df_list[i]['signal'].map({ 'Bullish': 1, 'Bearish': 0 })
-        df_list[i]['action_return_on_signal_index_categorical'] = df_list[i]['action_return_on_signal_index'] > 0.003
-        df_list[i]['action_return_on_signal_index_categorical'] = df_list[i]['action_return_on_signal_index_categorical'].astype(int)
-        df_list[i]['binary_5_ma_vol_break'] = df_list[i]['5_ma_volume_break'].astype(int)
-        df_list[i]['binary_5_ma_touch'] = df_list[i]['5_ma_touch'].astype(int)
+        df_list[i] = construct_categorical_cols_for_df(df_list[i], ticker_map)
     return df_list
 
 
@@ -348,7 +335,7 @@ def drop_rows_with_na_values_from_dfs(df_list, cols_to_consider):
 def select_best_actions_using_machine_learning(train_dfs, test_dfs, feature_col_names, label_col_name):
     # the model will train on each train set and will predict on a corresponding test set.
     # we will predict future values according to the model resulted from all train sets.
-    gpc = GaussianProcessClassifier(1*RBF(), random_state=0)
+    gpc = GaussianProcessClassifier(1*kernels.WhiteKernel(), random_state=0)
     # gbc = GradientBoostingClassifier(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0)
     over = SMOTE(sampling_strategy=0.3)
     # under = RandomUnderSampler(sampling_strategy=0.9)
@@ -356,6 +343,9 @@ def select_best_actions_using_machine_learning(train_dfs, test_dfs, feature_col_
     steps = [('o', over)]
     pipeline = Pipeline(steps=steps)
 
+    # train_dfs = drop_rows_with_na_values_from_dfs(train_dfs, feature_col_names)
+
+    scores_arr = []
     for i in range(len(train_dfs)):
         print(f'current index for model fit: {i}')
         train_features_array = train_dfs[i][feature_col_names].values
@@ -375,8 +365,12 @@ def select_best_actions_using_machine_learning(train_dfs, test_dfs, feature_col_
         print(f'classes count: {counter}')
         gpc.fit(train_features_array, train_label_array)
         # print(gpc.predict_proba(test_features_array))
-        print(gpc.score(test_features_array, test_label_array))
+        current_score = gpc.score(test_features_array, test_label_array)
+        print(f'current score: {current_score}')
+        scores_arr.append(current_score)
+        print(f'total score average until now: {np.mean(scores_arr)}')
         test_dfs[i]['prediction'] = gpc.predict(test_features_array)
+    print(f'final score average: {np.mean(scores_arr)}')
     dump(gpc, 'intraday_model.joblib') # TODO: in the realtime single day job, I should use model = load('intraday_model.joblib') to get the model
     return test_dfs
 
@@ -393,9 +387,9 @@ def backtest_intraday(adjusted_tickers):
 
     # adjusted_tickers = adjusted_tickers + ['SPY', 'QQQ', 'IWM']
 
-    stocks_dict = get_data_dict_for_multiple_stocks(adjusted_tickers, time)
+    # stocks_dict = get_data_dict_for_multiple_stocks(adjusted_tickers, time)
 
-    # stocks_dict, adjusted_tickers = get_data_dict_for_all_stocks_in_directory('stocks_csvs_raw')
+    stocks_dict, adjusted_tickers = get_data_dict_for_all_stocks_in_directory('stocks_csvs_raw')
 
     # stocks_dict = { tick: stocks_dict[tick].iloc[-(252*4):].reset_index(drop=True) for tick in adjusted_tickers }
 

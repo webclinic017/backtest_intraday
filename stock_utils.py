@@ -8,7 +8,7 @@ from indicators import get_ma_column_for_stock, simple_slope, get_breakout_colum
     get_touch_and_return_above_column_for_stock, get_macd_columns_for_stock, get_ATR_column_for_stock, \
     get_distance_between_columns_for_stock, get_adx_column_for_stock, rsi, stochastic, get_volatility_from_atr
 from signals import crossing_mas
-from utils import save_create_csv, get_leveraged_etfs, get_feature_col_names
+from utils import save_create_csv, get_leveraged_etfs, get_feature_col_names, transformation_sin_cos
 
 
 def get_only_trading_hours_from_df_dict(dfs_dict, tickers):
@@ -19,6 +19,24 @@ def get_only_trading_hours_from_df_dict(dfs_dict, tickers):
         dfs_dict[ticker] = dfs_dict[ticker][dfs_dict[ticker]['Date'].dt.time.between(start, end)]
         dfs_dict[ticker] = dfs_dict[ticker].reset_index()
     return dfs_dict
+
+
+def get_tickers_map(tickers_list):
+    return { index: ticker_name + 1 for ticker_name, index in enumerate(tickers_list) }
+
+
+def construct_categorical_cols_for_df(df, ticker_map):
+    df['ticker'] = df['ticker'].map(ticker_map)
+    df['ticker_sin'], df['ticker_cos'] = transformation_sin_cos(df['ticker'])
+    df['day_of_week'] = pd.to_datetime(df['Date'], format ='%Y-%m-%d %H:%M:%S').dt.dayofweek
+    df['day_of_week_sin'], df['day_of_week_cos'] = transformation_sin_cos(df['day_of_week'])
+    df['time_of_day'] = pd.to_datetime(df['Date'], format ='%Y-%m-%d %H:%M:%S').dt.hour.apply(lambda x: 1 if x >= 13 else 0)
+    df['binary_signal'] = df['signal'].map({ 'Bullish': 1, 'Bearish': 0 })
+    df['action_return_on_signal_index_categorical'] = df['action_return_on_signal_index'] > 0.003
+    df['action_return_on_signal_index_categorical'] = df['action_return_on_signal_index_categorical'].astype(int)
+    df['binary_5_ma_vol_break'] = df['5_ma_volume_break'].astype(int)
+    df['binary_5_ma_touch'] = df['5_ma_touch'].astype(int)
+    return df
 
 
 def get_live_positions_value(positions):
@@ -43,17 +61,17 @@ def get_stock_quantity_to_trade(live_positions_value, price, current_cash, pct_o
 def close_position(position_data, limit_price):
     if position_data.side == 'long':
         # sell the stock
-        return submit_limit_order(position_data.symbol, 'Exit Buy', limit_price, position_data.qty)
+        return submit_limit_order(position_data.symbol, limit_price, 'Exit Buy', position_data.qty)
     elif position_data.side == 'short':
         # buy the stock
-        return submit_limit_order(position_data.symbol, 'Exit Sell', limit_price, position_data.qty)
+        return submit_limit_order(position_data.symbol, limit_price, 'Exit Sell', position_data.qty)
 
 
 def get_live_positions_ticker_names(positions):
     ticker_names = []
     leveraged_etfs = get_leveraged_etfs()
     for position in positions:
-        leveraged_etfs_dict = next(item for item in leveraged_etfs if item["1x"] == position.symbol or item["2x"] == position.symbol or item["3x"] == position.symbol)
+        leveraged_etfs_dict = next(item for item in leveraged_etfs if (item["1x"] == position.symbol) or (item["leveraged"] == position.symbol) or (item["inverse_leveraged"] == position.symbol))
         ticker_names += leveraged_etfs_dict.values()
     return ticker_names
 
@@ -129,12 +147,15 @@ def apply_features_for_stocks(all_stocks_dict, tickers):
     return all_stocks_dict
 
 
-def get_leveraged_etf_price(ticker):
+def get_leveraged_etf_price(ticker, action):
     leveraged_etfs = get_leveraged_etfs()
     corresponding_leveraged_etf = None
     for etf in leveraged_etfs:
         if etf['1x'] == ticker:
-            corresponding_leveraged_etf = etf.values()[-1]
+            if 'Bullish' in action:
+                corresponding_leveraged_etf = etf['leveraged']
+            elif 'Bearish' in action:
+                corresponding_leveraged_etf = etf['inverse_leveraged']
             break
     corresponding_leveraged_etf_price = get_alpaca_stock_latest_bar(corresponding_leveraged_etf).c
     return corresponding_leveraged_etf, corresponding_leveraged_etf_price
@@ -146,8 +167,12 @@ def get_last_row_action_from_stock(last_row, ticker, model):
     if last_row['signal'] == 'Bullish' or last_row['signal'] == 'Bearish':
         feature_col_names = get_feature_col_names()
         last_row_as_array = last_row[feature_col_names].values
-        prediction = model.predict(last_row_as_array)[0]
+        prediction = 0
+        try:
+            prediction = model.predict(last_row_as_array)[0]
+        except Exception as e:
+            print(f'Error predicting ticker: {ticker}, row: {last_row}: {e}')
         return last_row['signal'], last_row['entry_price'], prediction
     if last_row['exits'] == 'Exit Buy' or last_row['exits'] == 'Exit Sell':
         return last_row['exits'], last_row['Close'], 0
-    return None, None, 0
+    return '', None, 0

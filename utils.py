@@ -1,3 +1,4 @@
+import math
 import os
 from datetime import datetime, timedelta
 import pandas as pd
@@ -41,38 +42,95 @@ def get_next_period_minute_window_date(minute_period, date):
 
 
 def get_leveraged_etfs():
+    # TODO: I should manage a better list than that. each dict should hold a "underlying_etf", "leveraged_etfs" (should research shortable etfs), "inverse_etfs" (should buy them in case of bearish flag)
+    # TODO: I should add DOW, also to the backtest
     leveraged_tickers = [{
         '1x': 'SPY',
-        '2x': 'SSO',
-        '3x': 'SPXL'
+        'leveraged': 'SPXL',
+        'inverse_leveraged': 'SPXU'
     }, {
         '1x': 'QQQ',
-        '2x': 'QLD',
-        '3x': 'TQQQ'
+        'leveraged': 'TQQQ',
+        'inverse_leveraged': 'SQQQ'
     }, {
         '1x': 'IWM',
-        '2x': 'UWM',
-        '3x': 'URTY'
+        'leveraged': 'URTY',
+        'inverse_leveraged': 'SRTY'
     }, {
         '1x': 'XLF',
-        '3x': 'FAS'
+        'leveraged': 'FAS',
+        'inverse_leveraged': 'FAZ'
     }, {
         '1x': 'XLE',
-        '2x': 'ERX',
-        '3x': 'OILU'
+        'leveraged': 'OILU',
+        'inverse_leveraged': 'ERY'
     }, {
         '1x': 'XLU',
-        '3x': 'UTSL'
+        'leveraged': 'UTSL',
+        'inverse_leveraged': 'SDP'
     }, {
         '1x': 'XLV',
-        '3x': 'CURE'
+        'leveraged': 'CURE',
+        'inverse_leveraged': 'RXD'
     }, {
         '1x': 'XLI',
-        '3x': 'DUSL'
+        'leveraged': 'DUSL',
+        'inverse_leveraged': 'SIJ'
     }, {
-        '1x': 'XLP'
+        '1x': 'XLP',
+        'leveraged': 'XLP',
+        'inverse_leveraged': 'SZK'
     }]
+
+    # leveraged_tickers = [{
+    #     '1x': 'SPY',
+    #     '2x': 'SSO',
+    #     '3x': 'SPXL',
+    #     '-3x': 'SPXU',
+    # }, {
+    #     '1x': 'QQQ',
+    #     '2x': 'QLD',
+    #     '3x': 'TQQQ',
+    #     '-3x': 'SQQQ',
+    # }, {
+    #     '1x': 'IWM',
+    #     '2x': 'UWM',
+    #     '3x': 'URTY',
+    #     '-3x': 'SRTY',
+    # }, {
+    #     '1x': 'XLF',
+    #     '3x': 'FAS',
+    #     '-3x': 'FAZ',
+    # }, {
+    #     '1x': 'XLE',
+    #     '2x': 'ERX',
+    #     '3x': 'OILU',
+    #     '-2x': 'ERY',
+    # }, {
+    #     '1x': 'XLU',
+    #     '3x': 'UTSL',
+    #     '-2x': 'SDP',
+    # }, {
+    #     '1x': 'XLV',
+    #     '3x': 'CURE',
+    #     '-2x': 'RXD',
+    # }, {
+    #     '1x': 'XLI',
+    #     '3x': 'DUSL',
+    #     '-2x': 'SIJ',
+    # }, {
+    #     '1x': 'XLP',
+    #     '-2x': 'SZK'
+    # }]
+
     return leveraged_tickers
+
+
+def transformation_sin_cos(column):
+  max_value = column.max()
+  sin_values = [math.sin((2 * math.pi * x) / max_value) for x in list(column)]
+  cos_values = [math.cos((2 * math.pi * x) / max_value) for x in list(column)]
+  return sin_values, cos_values
 
 
 def convert_action_to_api_action(order):
