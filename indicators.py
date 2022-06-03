@@ -109,7 +109,7 @@ def simple_slope(df, col_name, period):
     df_copy['slope'] = 0
     for i in range(len(df)):
         if i > period:
-            df_copy.at[i, 'slope'] = (df[col_name][i] - df[col_name][i-period+1]) / (period - 1)
+            df_copy.loc[i, 'slope'] = (df[col_name][i] - df[col_name][i-period+1]) / (period - 1)
     return df_copy['slope']
 
 
