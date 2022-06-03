@@ -215,7 +215,7 @@ def init_trading(ticker_names):
         timeout_to_open.start()
         timeout_to_close.start()
     # TODO: just for now testing. delete the following line call to on_market_open()!
-    on_market_open(tickers)
+    # on_market_open(tickers)
 
 
 '''
